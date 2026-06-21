@@ -1,0 +1,11 @@
+*.rdc
+imgui.ini
+build/
+.vs/
+compile_commands.json
+.direnv/
+.cache/
+vgcore*
+.zig-cache/
+zig-out/
+build-*/
