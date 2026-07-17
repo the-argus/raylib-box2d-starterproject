@@ -135,7 +135,7 @@ if(IMGUI_BUILD_RAYLIB_BINDING)
   find_package(raylib REQUIRED)
   target_sources(
     ${PROJECT_NAME}
-    PUBLIC ${RLIMGUI_SOURCE_DIR}/rlImGui.cpp
+    PRIVATE ${RLIMGUI_SOURCE_DIR}/rlImGui.cpp
     # PUBLIC FILE_SET HEADERS BASE_DIRS ${RLIMGUI_SOURCE_DIR} FILES
     # ${RLIMGUI_SOURCE_DIR}/imgui_impl_raylib.h ${RLIMGUI_SOURCE_DIR}/rlImGui.h
     # ${RLIMGUI_SOURCE_DIR}/rlImGuiColors.h
