@@ -4,17 +4,6 @@
 
 #include <fmt/format.h>
 
-// include raylib earlier and removed USE_LIBTYPE_SHARED. rlImGui is using
-// these raylib flags, which makes sense, but I want to link imgui statically
-// and raylib dynamically, in debug mode. This causes linker errors because
-// USE_LIBTYPE_SHARED is a public flag from raylib, which causes the rlimgui
-// headers to declare declspec dllimport symbols.
-#include <raylib.h>
-#undef USE_LIBTYPE_SHARED
-#ifdef BUILD_LIBTYPE_SHARED
-#error "BUILD_LIBTYPE_SHARED is defined for the executable?"
-#endif
-
 #include <rlImGui.h>
 #include <rlImGuiColors.h>
 

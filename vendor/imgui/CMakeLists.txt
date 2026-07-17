@@ -48,6 +48,12 @@ target_include_directories(
     "$<BUILD_INTERFACE:${IMGUI_SOURCE_DIR};${IMGUI_SOURCE_DIR}/test-engine>"
     $<INSTALL_INTERFACE:include>)
 
+if(BUILD_SHARED_LIBS AND WIN32)
+  target_compile_definitions(${PROJECT_NAME}
+    PRIVATE   "IMGUI_API=__declspec(dllexport)"
+    INTERFACE "IMGUI_API=__declspec(dllimport)")
+endif()
+
 target_sources(
   ${PROJECT_NAME}
   PRIVATE ${IMGUI_SOURCE_DIR}/imgui.cpp
