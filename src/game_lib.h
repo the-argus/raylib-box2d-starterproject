@@ -46,16 +46,6 @@ class GameLib
 #endif
     void *m_gameContext = nullptr;
 
-    void unloadIfLoaded()
-    {
-#if defined(HOTRELOAD_LIB_PATH)
-        if (m_library) {
-            dlload::close(m_library);
-            m_library = nullptr;
-        }
-#endif
-    }
-
   public:
     GameLib() = delete;
     constexpr GameLib(const char *libPath) : m_libPath(libPath) {}
@@ -65,6 +55,19 @@ class GameLib
     GameLib &operator=(GameLib &&) = delete;
     GameLib &operator=(const GameLib &) = delete;
     ~GameLib() { unloadIfLoaded(); }
+	
+    void unloadIfLoaded()
+    {
+#if defined(HOTRELOAD_LIB_PATH)
+        if (m_library) {
+            dlload::close(m_library);
+            m_library = nullptr;
+            m_frameCallback = nullptr;
+            m_initCallback = nullptr;
+            m_onHotReloadCallback = nullptr;
+        }
+#endif
+    }
 
     [[nodiscard]] bool firstLoad()
     {

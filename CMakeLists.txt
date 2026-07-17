@@ -29,7 +29,7 @@ set(main_source_files src/main.cpp)
 
 # the game may run `cmake --build HOTRELOAD_BUILD_DIR --target
 # HOTRELOAD_LIB_TARGET` in debug mode, and re-link to it
-if(GAME_NO_HOTRELOAD)
+if(NOT GAME_NO_HOTRELOAD)
   add_library(${PROJECT_NAME}_lib SHARED ${hotreloaded_source_files}
                                          ${common_source_files})
   add_executable(${PROJECT_NAME} ${main_source_files} ${common_source_files})
@@ -76,7 +76,7 @@ set_target_properties(
              CXX_MODULE_STD OFF
              CXX_EXTENSIONS OFF)
 
-if(GAME_NO_HOTRELOAD)
+if(NOT GAME_NO_HOTRELOAD)
   set_target_properties(
     ${PROJECT_NAME}_lib
     PROPERTIES CXX_STANDARD_REQUIRED ON
@@ -97,7 +97,7 @@ find_package(fmt REQUIRED NO_CMAKE_SYSTEM_PATH)
 # initialization that needs to stick around
 target_link_libraries(${PROJECT_NAME} raylib imgui::imgui fmt::fmt box2d::box2d)
 
-if(CMAKE_BUILD_TYPE MATCHES "Debug")
+if(NOT GAME_NO_HOTRELOAD)
   target_link_libraries(${PROJECT_NAME}_lib raylib imgui::imgui fmt::fmt box2d::box2d)
 endif()
 

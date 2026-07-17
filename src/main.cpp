@@ -128,6 +128,7 @@ void AppState::reloadIfNeeded()
         std::error_code errorCode;
         const auto dllLastWriteTime =
             std::filesystem::last_write_time(HOTRELOAD_LIB_PATH, errorCode);
+        gameLib.unloadIfLoaded();
         std::ignore = std::system("cmake --build " HOTRELOAD_BUILD_DIR
                                   " --target " HOTRELOAD_LIB_TARGET " --config Debug");
         if (!errorCode) {
