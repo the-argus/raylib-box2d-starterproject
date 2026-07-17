@@ -11,7 +11,7 @@
 template <typename T>
 concept ErrorLike = std::is_enum_v<T> &&
                     std::is_same_v<std::underlying_type_t<T>, u8> && requires {
-                        { T::Success } -> std::same_as<T>;
+                        { T::Success };
                         static_cast<u8>(T::Success) == 0;
                     };
 
