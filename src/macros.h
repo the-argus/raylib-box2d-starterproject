@@ -63,7 +63,7 @@ using f64 = double;
 static_assert(sizeof(f32) == 4);
 static_assert(sizeof(f64) == 8);
 
-#if defined(_WIN32)
+#if defined(_WIN32) && !defined(NO_HOTRELOAD)
 #define HOTRELOAD_EXPORT __declspec(dllexport)
 #else
 #define HOTRELOAD_EXPORT

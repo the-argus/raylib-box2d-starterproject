@@ -13,6 +13,10 @@ if(EXISTS ${PACKAGESOURCE})
   endforeach()
 endif()
 
+set(HOTRELOAD_DEFAULT CMAKE_BUILD_TYPE MATCHES "Debug")
+
+option(GAME_NO_HOTRELOAD "Whether to build a separate dynamic library of game code and check for changes in main code" $HOTRELOAD_DEFAULT)
+
 find_program(MOLD_PROGRAM mold)
 if(MOLD_PROGRAM)
   set(CMAKE_LINKER_TYPE MOLD)
@@ -25,7 +29,7 @@ set(main_source_files src/main.cpp)
 
 # the game may run `cmake --build HOTRELOAD_BUILD_DIR --target
 # HOTRELOAD_LIB_TARGET` in debug mode, and re-link to it
-if(CMAKE_BUILD_TYPE MATCHES "Debug")
+if(GAME_NO_HOTRELOAD)
   add_library(${PROJECT_NAME}_lib SHARED ${hotreloaded_source_files}
                                          ${common_source_files})
   add_executable(${PROJECT_NAME} ${main_source_files} ${common_source_files})
@@ -49,8 +53,15 @@ set(DEBUG_LINK_OPTIONS -fsanitize=address)
 if(CMAKE_BUILD_TYPE MATCHES "Debug" AND NOT MSVC)
   target_compile_options(${PROJECT_NAME} PRIVATE ${DEBUG_COMPILE_OPTIONS})
   target_link_options(${PROJECT_NAME} PRIVATE ${DEBUG_LINK_OPTIONS})
-  target_compile_options(${PROJECT_NAME}_lib PRIVATE ${DEBUG_COMPILE_OPTIONS})
-  target_link_options(${PROJECT_NAME}_lib PRIVATE ${DEBUG_LINK_OPTIONS})
+
+  if(NOT GAME_NO_HOTRELOAD)
+	  target_compile_options(${PROJECT_NAME}_lib PRIVATE ${DEBUG_COMPILE_OPTIONS})
+	  target_link_options(${PROJECT_NAME}_lib PRIVATE ${DEBUG_LINK_OPTIONS})
+  endif()
+endif()
+
+if(GAME_NO_HOTRELOAD)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE NO_HOTRELOAD)
 endif()
 
 if(CMAKE_BUILD_TYPE MATCHES "Release")
@@ -65,7 +76,7 @@ set_target_properties(
              CXX_MODULE_STD OFF
              CXX_EXTENSIONS OFF)
 
-if(CMAKE_BUILD_TYPE MATCHES "Debug")
+if(GAME_NO_HOTRELOAD)
   set_target_properties(
     ${PROJECT_NAME}_lib
     PROPERTIES CXX_STANDARD_REQUIRED ON

@@ -10,6 +10,7 @@
 #include <cstring>
 #include <span>
 
+namespace b2 {
 using Vec2 = b2Vec2;
 struct Vec2I32
 {
@@ -1171,5 +1172,5 @@ template <bool isConst> class WorldImpl
 
 using World = WorldImpl<false>;
 using WorldConst = WorldImpl<true>;
-
+} // namespace b2
 #endif

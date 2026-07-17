@@ -1,13 +1,17 @@
 #include "box2d.h"
 #include "game_lib.h"
 #include "logging.h"
+#include "defer.h"
+
+#include <raylib.h>
+#include <rlImGui.h>
 
 struct Context
 {
-    World world;
-    Body floor;
-    Body square;
-    Vec2U32 windowSize{}; // changes on events
+    b2::World world;
+    b2::Body floor;
+    b2::Body square;
+    b2::Vec2U32 windowSize{}; // changes on events
 };
 
 extern "C"
@@ -16,6 +20,7 @@ extern "C"
     // future calls
     HOTRELOAD_EXPORT void *init()
     {
+        using namespace b2;
         LOGINFO_MSG(Gameplay, "gamelib init() called");
         const auto world = World::createWorld({});
 
@@ -65,12 +70,23 @@ extern "C"
         // here... but then maybe things become unstable at low framerates
         ctx->world.step(1.0f / 60.0f);
 
-        // if (ctx->windowSize) {
-        //     SDL_SetRenderLogicalPresentation(
-        //         renderer, ctx->windowSize->x, ctx->windowSize->y,
-        //         SDL_LOGICAL_PRESENTATION_LETTERBOX);
-        //     ctx->windowSize = null;
-        // }
+        BeginDrawing();
+        defer endDrawing = [] { EndDrawing(); };
+
+        ClearBackground(DARKGRAY);
+
+        rlImGuiBegin();
+        defer rlEnd = [] { rlImGuiEnd(); };
+
+        {
+            ImGui::Begin("my window");
+            defer end = [] { ImGui::End(); };
+
+            if (ImGui::Button("testing stuffing button")) {
+                printf("testing 2...\n");
+            }
+        }
+
         return true;
     }
 }

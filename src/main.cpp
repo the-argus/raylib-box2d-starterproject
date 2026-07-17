@@ -51,23 +51,19 @@ int main()
         return EXIT_FAILURE;
     }
 
+    SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(420, 720, "Underhanders");
     defer closeWindow = [] { CloseWindow(); };
+
+    SetTargetFPS(144);
 
     rlImGuiSetup(true);
     defer closeRlImGui = [] { rlImGuiShutdown(); };
 
     while (!WindowShouldClose()) {
         state.reloadIfNeeded();
-        // ImGui_ImplSDLRenderer3_NewFrame();
-        // ImGui_ImplSDL3_NewFrame();
-        // ImGui::NewFrame();
 
         const bool shouldContinue = state.gameLib.frame();
-
-        // ImGui::Render();
-        // ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(),
-        // renderer);
 
         if (!shouldContinue) {
             break;
@@ -132,10 +128,8 @@ void AppState::reloadIfNeeded()
         std::error_code errorCode;
         const auto dllLastWriteTime =
             std::filesystem::last_write_time(HOTRELOAD_LIB_PATH, errorCode);
-        std::ignore =
-            std::system(fmt::format("cmake --build {} --target {}",
-                                    HOTRELOAD_BUILD_DIR, HOTRELOAD_LIB_TARGET)
-                            .c_str());
+        std::ignore = std::system("cmake --build " HOTRELOAD_BUILD_DIR
+                                  " --target " HOTRELOAD_LIB_TARGET " --config Debug");
         if (!errorCode) {
             const auto recompiledDllLastWriteTime =
                 std::filesystem::last_write_time(HOTRELOAD_LIB_PATH, errorCode);
