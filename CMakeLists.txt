@@ -48,9 +48,11 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "Emscripten")
 endif()
 
 set(common_source_files src/logging.cpp)
-set(hotreloaded_source_files src/entry.cpp src/arena.cpp src/assets.cpp
-                             src/player.cpp)
+set(hotreloaded_source_files
+    src/entry.cpp src/arena.cpp src/assets.cpp src/player.cpp
+    vendor/raylib_box2d_debugdraw/raylib_box2d_debugdraw.c)
 set(main_source_files src/main.cpp)
+set(include_directories src/ vendor/raylib_box2d_debug_draw)
 
 # the game may run `cmake --build HOTRELOAD_BUILD_DIR --target
 # HOTRELOAD_LIB_TARGET` in debug mode, and re-link to it
@@ -126,9 +128,9 @@ if(NOT GAME_NO_HOTRELOAD)
                CXX_SCAN_FOR_MODULES OFF
                CXX_MODULE_STD OFF
                CXX_EXTENSIONS OFF)
-  target_include_directories(${PROJECT_NAME}_lib PRIVATE src/)
+  target_include_directories(${PROJECT_NAME}_lib PRIVATE ${include_directories})
 endif()
-target_include_directories(${PROJECT_NAME} PRIVATE src/)
+target_include_directories(${PROJECT_NAME} PRIVATE ${include_directories})
 
 find_package(raylib REQUIRED NO_CMAKE_SYSTEM_PATH)
 find_package(box2d REQUIRED NO_CMAKE_SYSTEM_PATH)
