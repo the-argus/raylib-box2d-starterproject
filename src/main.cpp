@@ -93,7 +93,7 @@ int main()
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(420, 720, "Underhanders");
 
-    SetTargetFPS(144);
+    SetTargetFPS(60); // physics timestep is 1/60 so everything is fine here
 
     rlImGuiSetup(true);
 

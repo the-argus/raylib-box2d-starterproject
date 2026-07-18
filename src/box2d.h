@@ -10,6 +10,39 @@
 #include <cstring>
 #include <span>
 
+enum class CollisionLayer : u64
+{
+    // clang-format off
+    World  = 0b0000001,
+    Player = 0b0000010,
+    // clang-format on
+};
+
+constexpr u64 operator|(CollisionLayer lhs, CollisionLayer rhs)
+{
+    return static_cast<u64>(lhs) | static_cast<u64>(rhs);
+}
+constexpr u64 operator|(u64 lhs, CollisionLayer rhs)
+{
+    return lhs | static_cast<u64>(rhs);
+}
+constexpr u64 operator|(CollisionLayer lhs, u64 rhs)
+{
+    return static_cast<u64>(lhs) | rhs;
+}
+constexpr u64 operator&(CollisionLayer lhs, CollisionLayer rhs)
+{
+    return static_cast<u64>(lhs) & static_cast<u64>(rhs);
+}
+constexpr u64 operator&(u64 lhs, CollisionLayer rhs)
+{
+    return lhs & static_cast<u64>(rhs);
+}
+constexpr u64 operator&(CollisionLayer lhs, u64 rhs)
+{
+    return static_cast<u64>(lhs) & rhs;
+}
+
 namespace b2 {
 using Vec2 = b2Vec2;
 struct Vec2I32
@@ -52,6 +85,7 @@ enum class ShapeType
     ChainSegment,
 };
 
+using MotionLocks = b2MotionLocks;
 using Circle = b2Circle;
 using Capsule = b2Capsule;
 using Segment = b2Segment;
@@ -61,6 +95,8 @@ using ShapeDef = b2ShapeDef;
 using BodyDef = b2BodyDef;
 using WorldDef = b2WorldDef;
 using ContactData = b2ContactData;
+using PlaneResult = b2PlaneResult;
+using CollisionPlane = b2CollisionPlane;
 using PhysicsSurfaceMaterial = b2SurfaceMaterial;
 using PhysicsFilter = b2Filter;
 using PhysicsQueryFilter = b2QueryFilter;
@@ -69,6 +105,7 @@ using PhysicsRaycastInput = b2RayCastInput;
 using PhysicsFrictionCallback = b2FrictionCallback;
 using PhysicsRestitutionCallback = b2RestitutionCallback;
 using PhysicsRaycastResultFunction = b2CastResultFcn;
+using PhysicsPlaneResultFunction = b2PlaneResultFcn;
 using PhysicsTreeStats = b2TreeStats;
 struct PhysicsContactTuningOptions
 {
@@ -125,12 +162,12 @@ namespace detail {
 template <typename T, typename IDType, typename GetCapacityCallable,
           typename GetBufferCallable>
 [[nodiscard]] Result<std::span<T>, alloc::Error>
-getDataBufferHelper(Allocator &allocator, IDType id,
+getDataBufferHelper(Allocator *allocator, IDType id,
                     const GetCapacityCallable &getCapacity,
                     const GetBufferCallable &getBuffer)
 {
     const u32 needed = getCapacity(id);
-    const auto buffer = allocator.allocate(alloc::Request{
+    const auto buffer = allocator->allocate(alloc::Request{
         .numBytes = sizeof(T) * needed,
         .alignment = alignof(T),
     });
@@ -143,7 +180,7 @@ getDataBufferHelper(Allocator &allocator, IDType id,
     const int used = getBuffer(id, start, needed);
     uassert(needed == static_cast<u32>(used), "box2d bug");
 
-    return std::span<T>(*start, needed);
+    return std::span<T>(start, needed);
 }
 
 [[nodiscard]] inline int sensorGetOverlappingShapesUnsafe(b2ShapeId id,
@@ -219,10 +256,12 @@ shapeSensorGetNumOverlappingShapes(b2ShapeId sensor) NOEXCEPT
 template <bool isConst>
 constexpr auto castShapeIDToShape = [](std::span<b2ShapeId> shapeIds) {
     using T = ShapeImpl<isConst>;
-    return std::span<T>(static_cast<void *>(shapeIds.data()),
+    return std::span<T>(std::launder(reinterpret_cast<T *>(shapeIds.data())),
                         shapeIds.size_bytes() / sizeof(T));
 };
 } // namespace detail
+
+template <bool isConst> class WorldImpl;
 
 template <bool isConst> class ShapeImpl
 {
@@ -234,6 +273,7 @@ template <bool isConst> class ShapeImpl
   public:
     template <bool bodyConst> friend class BodyImpl;
     friend class ShapeImpl<not isConst>;
+    template <bool worldConst> friend class WorldImpl;
 
     [[nodiscard]] static ShapeDef defaultDefinition()
     {
@@ -426,11 +466,23 @@ template <bool isConst> class ShapeImpl
         return *this;
     }
 
+    Circle circle() const NOEXCEPT
+    {
+        uassert(type() == ShapeType::Circle);
+        return b2Shape_GetCircle(id);
+    }
+
     ShapeImpl setCapsule(const Capsule &capsule) const NOEXCEPT
         requires(not isConst)
     {
         b2Shape_SetCapsule(id, &capsule);
         return *this;
+    }
+
+    Capsule capsule() const NOEXCEPT
+    {
+        uassert(type() == ShapeType::Capsule);
+        return b2Shape_GetCapsule(id);
     }
 
     ShapeImpl setSegment(const Segment &segment) const NOEXCEPT
@@ -440,11 +492,23 @@ template <bool isConst> class ShapeImpl
         return *this;
     }
 
+    Segment segment() const NOEXCEPT
+    {
+        uassert(type() == ShapeType::Segment);
+        return b2Shape_GetSegment(id);
+    }
+
     ShapeImpl setPolygon(const Polygon &polygon) const NOEXCEPT
         requires(not isConst)
     {
         b2Shape_SetPolygon(id, &polygon);
         return *this;
+    }
+
+    Polygon polygon() const NOEXCEPT
+    {
+        uassert(type() == ShapeType::Polygon);
+        return b2Shape_GetPolygon(id);
     }
 
     [[nodiscard]] b2ChainId parentChain() const NOEXCEPT
@@ -465,7 +529,7 @@ template <bool isConst> class ShapeImpl
     }
 
     [[nodiscard]] Result<std::span<ShapeImpl<isConst>>, alloc::Error>
-    overlappingShapes(Allocator &allocator) const NOEXCEPT
+    overlappingShapes(Allocator *allocator) const NOEXCEPT
     {
         static_assert(sizeof(b2ShapeId) == sizeof(ShapeImpl));
         static_assert(alignof(b2ShapeId) == alignof(ShapeImpl));
@@ -477,7 +541,7 @@ template <bool isConst> class ShapeImpl
     }
 
     [[nodiscard]] Result<std::span<ContactData>, alloc::Error>
-    contactData(Allocator &allocator) const NOEXCEPT
+    contactData(Allocator *allocator) const NOEXCEPT
     {
         return detail::getDataBufferHelper<ContactData>(
             allocator, id, detail::shapeGetContactCapacity,
@@ -690,7 +754,7 @@ template <bool isConst> class BodyImpl
     /// @note Box2D uses speculative collision so some contact points may be
     /// separated.
     [[nodiscard]] Result<std::span<ContactData>, alloc::Error>
-    contactData(Allocator &allocator) const NOEXCEPT
+    contactData(Allocator *allocator) const NOEXCEPT
     {
         return detail::getDataBufferHelper<ContactData>(
             allocator, id, detail::bodyGetContactCapacity,
@@ -715,7 +779,7 @@ template <bool isConst> class BodyImpl
 
     /// Get the joint ids for all joints on this body
     [[nodiscard]] Result<std::span<b2JointId>, alloc::Error>
-    joints(Allocator &allocator) const NOEXCEPT
+    joints(Allocator *allocator) const NOEXCEPT
     {
         return detail::getDataBufferHelper<b2JointId>(
             allocator, id, detail::bodyGetJointCount,
@@ -733,14 +797,31 @@ template <bool isConst> class BodyImpl
         return {};
     }
 
-    /// Get the shape ids for all shapes on this body
+    /// Get the shape ids for all shapes on this body, returning the relevant
+    /// error
+    ///
+    /// caller owns returned memory
     [[nodiscard]] Result<std::span<ShapeImpl<isConst>>, alloc::Error>
-    shapes(Allocator &allocator) const NOEXCEPT
+    shapesErr(Allocator *allocator) const NOEXCEPT
     {
         return detail::getDataBufferHelper<b2ShapeId>(
                    allocator, id, detail::bodyGetShapeCount,
                    detail::bodyGetShapesUnsafe)
             .map(detail::castShapeIDToShape<isConst>);
+    }
+
+    /// Get all the shape ids for tall shapes on this body, returning empty
+    /// span on an error
+    ///
+    /// caller owns returned memory
+    [[nodiscard]] std::span<ShapeImpl<isConst>>
+    shapes(Allocator *allocator) const NOEXCEPT
+    {
+        return detail::getDataBufferHelper<b2ShapeId>(
+                   allocator, id, detail::bodyGetShapeCount,
+                   detail::bodyGetShapesUnsafe)
+            .map(detail::castShapeIDToShape<isConst>)
+            .value_or({});
     }
 
     /// Might return null ID, check isValid on result
@@ -1040,6 +1121,35 @@ template <bool isConst> class WorldImpl
         return b2World_CastMover(id, origin, &mover, translation, filter);
     }
 
+    void collideMoverUserData(const Capsule &mover, Vec2 origin,
+                              PhysicsQueryFilter filter,
+                              PhysicsPlaneResultFunction planeResultFunction,
+                              void *userdata) const NOEXCEPT
+    {
+        b2World_CollideMover(id, origin, &mover, filter, planeResultFunction,
+                             userdata);
+    }
+
+    /// Collide a capsule mover with the world, gathering collision planes that
+    /// can be fed to solvePlanes. Useful for kinematic character movement.
+    /// The mover capsule and the resulting planes are relative to the origin.
+    /// Return true from the callback function to continue looking at planes, or
+    /// false to stop
+    template <typename Callable>
+        requires std::is_invocable_r_v<bool, Callable &, ShapeImpl<true>,
+                                       const PlaneResult *>
+    void collideMover(const Capsule &mover, Vec2 origin,
+                      PhysicsQueryFilter filter, Callable &planeVisitor)
+    {
+        void *userdata = std::addressof(planeVisitor);
+        auto function = [](b2ShapeId shape, const b2PlaneResult *plane,
+                           void *ctx) -> bool {
+            return std::invoke(static_cast<Callable *>(ctx),
+                               ShapeImpl<true>(shape), plane);
+        };
+        this->collideMoverUserData(mover, origin, filter, function, userdata);
+    }
+
     struct RayCastOptions
     {
         /// The start point of the ray
@@ -1048,22 +1158,48 @@ template <bool isConst> class WorldImpl
         Vec2 translation = {};
         /// Contains bit flags to filter unwanted shapes from the results
         PhysicsQueryFilter filter = {};
-        /// A user implemented callback function
-        PhysicsRaycastResultFunction *fcn = nullptr;
-        /// A user context that is passed along to the callback function
-        void *context = nullptr;
     };
 
     /// Cast a ray into the world to collect shapes in the path of the ray.
     /// Your callback function controls whether you get the closest point, any
     /// point, or n-points.
+    /// The return value of the callback can control things:
+    /// return -1: ignore this shape and continue
+    /// return 0: terminate the ray cast
+    /// return fraction: clip the ray to this point
+    /// return 1: don't clip the ray and continue
     /// @note The callback function may receive shapes in any order
     ///	@return traversal performance counters
     [[nodiscard]] PhysicsTreeStats
-    castRay(const RayCastOptions &options) const NOEXCEPT
+    castRayUserData(const RayCastOptions &options,
+                    PhysicsRaycastResultFunction *fcn = nullptr,
+                    void *userdata = nullptr) const NOEXCEPT
     {
         return b2WorldCastRay(id, options.origin, options.translation,
                               options.filter, options.context);
+    }
+
+    /// The return value of the callback can control things:
+    /// return -1: ignore this shape and continue
+    /// return 0: terminate the ray cast
+    /// return fraction: clip the ray to this point
+    /// return 1: don't clip the ray and continue
+    template <typename Callable>
+        requires std::is_invocable_r_v<
+            f32, Callable &, ShapeImpl<true> /* shapeHit */,
+            Vec2 /* position */, Vec2 /* collision normal */,
+            f32 /* fraction of ray at which this hit occurred*/>
+    PhysicsTreeStats castRay(const RayCastOptions &options,
+                             Callable &hitCallback)
+    {
+        void *userdata = std::addressof(hitCallback);
+        auto function = [](b2ShapeId shapeId, b2Pos point, b2Vec2 normal,
+                           float fraction, void *context) -> bool {
+            return std::invoke(static_cast<Callable *>(context),
+                               ShapeImpl<true>(shapeId), point, normal,
+                               fraction);
+        };
+        return this->castRayUserData(options, function, userdata);
     }
 
     struct RayCastClosestOptions
@@ -1091,16 +1227,33 @@ template <bool isConst> class WorldImpl
         const b2ShapeProxy *proxy = nullptr;
         Vec2 translation = {};
         PhysicsQueryFilter filter = {};
-        PhysicsRaycastResultFunction *callback = nullptr;
-        void *context = nullptr;
     };
 
     /// Cast a shape through the world. Similar to a cast ray except that a
     /// shape is cast instead of a point.
     ///	@see castRay
-    [[nodiscard]] PhysicsTreeStats
-    castShape(const ShapeCastOptions &options) const NOEXCEPT
+    PhysicsTreeStats
+    castShapeUserData(const ShapeCastOptions &options,
+                      PhysicsRaycastResultFunction *callback = nullptr,
+                      void *userdata = nullptr) const NOEXCEPT
     {
+        b2WorldCastShape(id, *options.proxy, options.translation,
+                         options.filter, callback, userdata);
+    }
+
+    template <typename Callable>
+        requires std::is_invocable_r_v<f32, Callable, ShapeImpl<true>,
+                                       Vec2 /* point */, Vec2 /* normal */,
+                                       f32 /* fraction along moved ray */>
+    PhysicsTreeStats castShape(const ShapeCastOptions &options,
+                               Callable &&callable) const NOEXCEPT
+    {
+        auto *ptr = static_cast<void *>(std::addressof(callable));
+        auto function = [](b2ShapeId shape, Vec2 point, Vec2 normal,
+                           f32 fraction, void *userData) {
+            std::invoke(static_cast<Callable *>(userData),
+                        ShapeImpl<true>(shape), point, normal, fraction);
+        };
         b2WorldCastShape(id, *options.proxy, options.translation,
                          options.filter, options.function, options.context);
     }

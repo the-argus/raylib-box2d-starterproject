@@ -48,7 +48,7 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "Emscripten")
 endif()
 
 set(common_source_files src/logging.cpp)
-set(hotreloaded_source_files src/entry.cpp src/arena.cpp)
+set(hotreloaded_source_files src/entry.cpp src/arena.cpp src/assets.cpp)
 set(main_source_files src/main.cpp)
 
 # the game may run `cmake --build HOTRELOAD_BUILD_DIR --target
@@ -134,13 +134,19 @@ find_package(box2d REQUIRED NO_CMAKE_SYSTEM_PATH)
 find_package(imgui REQUIRED NO_CMAKE_SYSTEM_PATH)
 find_package(fmt REQUIRED NO_CMAKE_SYSTEM_PATH)
 
+add_subdirectory(assets)
+
 # main needs raylib and imgui because those have some static/global
 # initialization that needs to stick around
 target_link_libraries(${PROJECT_NAME} raylib imgui::imgui fmt::fmt box2d::box2d)
 
 if(NOT GAME_NO_HOTRELOAD)
   target_link_libraries(${PROJECT_NAME}_lib raylib imgui::imgui fmt::fmt
-                        box2d::box2d)
+                        box2d::box2d game::resources)
+  target_compile_definitions(${PROJECT_NAME}_lib PRIVATE CMRC_NO_EXCEPTIONS=1)
+else()
+  target_link_libraries(${PROJECT_NAME} game::resources)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE CMRC_NO_EXCEPTIONS=1)
 endif()
 
 # on windows, copy all DLLs into build result folder

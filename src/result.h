@@ -102,6 +102,13 @@ struct Result<T, Error>
     {
     }
 
+    /// Returns a copy of the stored value, or a copy of the defaultValue
+    /// argument if this stores an error.
+    constexpr T value_or(const T &defaultValue) NOEXCEPT
+    {
+        return isError() ? defaultValue : this->m_value;
+    }
+
     template <typename Callable>
         requires std::is_invocable_v<Callable, const T &>
     constexpr auto map(Callable &&callable) const &NOEXCEPT
@@ -112,8 +119,8 @@ struct Result<T, Error>
         if (isError()) {
             return ReturnType(this->error());
         } else {
-            return ReturnType(std::invoke(std::forward<Callable>(callable),
-                                          this->m_value.value));
+            return ReturnType(
+                std::invoke(std::forward<Callable>(callable), this->m_value));
         }
     }
 
@@ -127,8 +134,8 @@ struct Result<T, Error>
         if (isError()) {
             return ReturnType(this->error());
         } else {
-            return ReturnType(std::invoke(std::forward<Callable>(callable),
-                                          this->m_value.value));
+            return ReturnType(
+                std::invoke(std::forward<Callable>(callable), this->m_value));
         }
     }
 
@@ -143,7 +150,7 @@ struct Result<T, Error>
             return ReturnType(this->error());
         } else {
             return ReturnType(std::invoke(std::forward<Callable>(callable),
-                                          std::move(this->m_value.value)));
+                                          std::move(this->m_value)));
         }
     }
 };
@@ -165,6 +172,11 @@ struct Result<T, Error>
         uassert(isSuccess(),
                 "Attempt to get value of a result that is not a success");
         return *m_value;
+    }
+
+    [[nodiscard]] T value_or(T defaultValue) const &
+    {
+        return isError() ? defaultValue : value();
     }
 
     [[nodiscard]] T operator->() const &

@@ -25,6 +25,7 @@ enum class LoggingCategory
     Renderer,
     Physics,
     Gameplay,
+    Assets,
     Hotreload,
     Serialization,
     Raylib,
