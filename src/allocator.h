@@ -263,4 +263,13 @@ class CAllocator : public Allocator
     }
 };
 
+namespace detail {
+constexpr inline CAllocator cAllocatorInstance{};
+}
+
+constexpr inline Allocator *cAllocator()
+{
+    return const_cast<CAllocator *>(&detail::cAllocatorInstance);
+}
+
 #endif

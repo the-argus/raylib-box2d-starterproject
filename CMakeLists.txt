@@ -48,7 +48,8 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "Emscripten")
 endif()
 
 set(common_source_files src/logging.cpp)
-set(hotreloaded_source_files src/entry.cpp src/arena.cpp src/assets.cpp)
+set(hotreloaded_source_files src/entry.cpp src/arena.cpp src/assets.cpp
+                             src/player.cpp)
 set(main_source_files src/main.cpp)
 
 # the game may run `cmake --build HOTRELOAD_BUILD_DIR --target

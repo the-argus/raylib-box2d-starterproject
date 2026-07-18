@@ -92,6 +92,7 @@ using Segment = b2Segment;
 using ChainSegment = b2ChainSegment;
 using Polygon = b2Polygon;
 using ShapeDef = b2ShapeDef;
+using ShapeProxy = b2ShapeProxy;
 using BodyDef = b2BodyDef;
 using WorldDef = b2WorldDef;
 using ContactData = b2ContactData;
@@ -1139,12 +1140,12 @@ template <bool isConst> class WorldImpl
         requires std::is_invocable_r_v<bool, Callable &, ShapeImpl<true>,
                                        const PlaneResult *>
     void collideMover(const Capsule &mover, Vec2 origin,
-                      PhysicsQueryFilter filter, Callable &planeVisitor)
+                      PhysicsQueryFilter filter, Callable &&planeVisitor)
     {
         void *userdata = std::addressof(planeVisitor);
         auto function = [](b2ShapeId shape, const b2PlaneResult *plane,
                            void *ctx) -> bool {
-            return std::invoke(static_cast<Callable *>(ctx),
+            return std::invoke(*static_cast<Callable *>(ctx),
                                ShapeImpl<true>(shape), plane);
         };
         this->collideMoverUserData(mover, origin, filter, function, userdata);
@@ -1175,8 +1176,8 @@ template <bool isConst> class WorldImpl
                     PhysicsRaycastResultFunction *fcn = nullptr,
                     void *userdata = nullptr) const NOEXCEPT
     {
-        return b2WorldCastRay(id, options.origin, options.translation,
-                              options.filter, options.context);
+        return b2World_CastRay(id, options.origin, options.translation,
+                               options.filter, options.context);
     }
 
     /// The return value of the callback can control things:
@@ -1190,12 +1191,12 @@ template <bool isConst> class WorldImpl
             Vec2 /* position */, Vec2 /* collision normal */,
             f32 /* fraction of ray at which this hit occurred*/>
     PhysicsTreeStats castRay(const RayCastOptions &options,
-                             Callable &hitCallback)
+                             Callable &&hitCallback)
     {
         void *userdata = std::addressof(hitCallback);
         auto function = [](b2ShapeId shapeId, b2Pos point, b2Vec2 normal,
                            float fraction, void *context) -> bool {
-            return std::invoke(static_cast<Callable *>(context),
+            return std::invoke(*static_cast<Callable *>(context),
                                ShapeImpl<true>(shapeId), point, normal,
                                fraction);
         };
@@ -1218,13 +1219,14 @@ template <bool isConst> class WorldImpl
     [[nodiscard]] PhysicsRaycastResult<isConst>
     castRayClosest(const RayCastClosestOptions &options) const NOEXCEPT
     {
-        b2WorldCastRayClosest(id, options.origin, options.translation,
-                              options.filter);
+        b2World_CastRayClosest(id, options.origin, options.translation,
+                               options.filter);
     }
 
     struct ShapeCastOptions
     {
         const b2ShapeProxy *proxy = nullptr;
+        Vec2 origin = {};
         Vec2 translation = {};
         PhysicsQueryFilter filter = {};
     };
@@ -1237,10 +1239,13 @@ template <bool isConst> class WorldImpl
                       PhysicsRaycastResultFunction *callback = nullptr,
                       void *userdata = nullptr) const NOEXCEPT
     {
-        b2WorldCastShape(id, *options.proxy, options.translation,
-                         options.filter, callback, userdata);
+        return b2World_CastShape(id, options.origin, options.proxy,
+                                 options.translation, options.filter, callback,
+                                 userdata);
     }
 
+    /// for the callable, return -1 to filter, 0 to terminate, fraction to clip
+    /// the ray for closest hit, 1 to continue
     template <typename Callable>
         requires std::is_invocable_r_v<f32, Callable, ShapeImpl<true>,
                                        Vec2 /* point */, Vec2 /* normal */,
@@ -1249,13 +1254,12 @@ template <bool isConst> class WorldImpl
                                Callable &&callable) const NOEXCEPT
     {
         auto *ptr = static_cast<void *>(std::addressof(callable));
-        auto function = [](b2ShapeId shape, Vec2 point, Vec2 normal,
-                           f32 fraction, void *userData) {
-            std::invoke(static_cast<Callable *>(userData),
-                        ShapeImpl<true>(shape), point, normal, fraction);
+        constexpr auto function = [](b2ShapeId shape, Vec2 point, Vec2 normal,
+                                     f32 fraction, void *userData) -> f32 {
+            return std::invoke(*static_cast<Callable *>(userData),
+                               ShapeImpl<true>(shape), point, normal, fraction);
         };
-        b2WorldCastShape(id, *options.proxy, options.translation,
-                         options.filter, options.function, options.context);
+        return castShapeUserData(options, function, ptr);
     }
 
     /// Enable/disable continuous collision between dynamic and static bodies.

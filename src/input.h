@@ -6,6 +6,10 @@
 
 #include "macros.h"
 
+// TODO: should probably know whether the app had focus last frame, then we can
+// consider losing focus to cause a key release or regaining focus while pressed
+// to cause a key press
+
 /// introduces a rudimentary concept of focus, something is either an input to
 /// the game or an input to UI
 [[nodiscard]] inline bool isMouseButtonDownInApp(int button)
@@ -20,9 +24,24 @@
     return GetMouseWheelMoveV().y;
 }
 
-[[nodiscard]] inline bool isKeyPressedInApp(int button)
+[[nodiscard]] inline bool isKeyJustPressedInApp(int button)
 {
     return not ImGui::GetIO().WantCaptureMouse and IsKeyPressed(button);
+}
+
+[[nodiscard]] inline bool isKeyDownInApp(int button)
+{
+    return not ImGui::GetIO().WantCaptureMouse and IsKeyDown(button);
+}
+
+[[nodiscard]] inline bool isKeyUpInApp(int button)
+{
+    return ImGui::GetIO().WantCaptureMouse || IsKeyUp(button);
+}
+
+[[nodiscard]] inline bool isKeyJustReleasedInApp(int button)
+{
+    return not ImGui::GetIO().WantCaptureMouse and IsKeyReleased(button);
 }
 
 [[nodiscard]] inline Vector2 getMouseDeltaInApp()

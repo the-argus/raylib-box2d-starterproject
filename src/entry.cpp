@@ -3,14 +3,15 @@
 #include "box2d.h"
 #include "convert.h"
 #include "defer.h"
+#include "game_context.h"
 #include "game_lib.h"
+#include "input.h"
 #include "logging.h"
+#include "player.h"
 
 #include <raylib.h>
 #include <raymath.h>
 #include <rlImGui.h>
-
-
 
 void debugDrawPhysicsBody(Allocator *allocator, b2::Body body, Color color)
 {
@@ -90,13 +91,18 @@ extern "C"
         box2.name = "square";
         box2.motionLocks = {.angularZ = true};
 
-        auto *out = new Context{
+        auto *out = new GameContext{
             .world = world,
             .floor = world.createBody(&box1),
             .square = world.createBody(&box2),
             .camera = Camera2D{.target = conv(box2.position), .zoom = 16.f},
             .textureMissing = assets::uploadTexture("missing.png"),
         };
+
+        Result player = out->gameAllocator.make<Player>();
+        if (!player)
+            LOGFATAL_MSG(Gameplay, "OOM");
+        out->player = &player.value();
 
         out->square.addPolygonShape({}, b2MakeSquare(1.f));
         out->floor.addSegmentShape({}, {.point1 = {-10, 0}, .point2 = {10, 0}});
@@ -106,7 +112,7 @@ extern "C"
 
     HOTRELOAD_EXPORT void deinit(void *context)
     {
-        auto *const ctx = static_cast<Context *>(context);
+        auto *const ctx = static_cast<GameContext *>(context);
         delete ctx;
     }
 
@@ -121,10 +127,15 @@ extern "C"
     /// return true if continue, false if quit
     HOTRELOAD_EXPORT bool frame(void *context)
     {
-        auto *const ctx = static_cast<Context *>(context);
+        auto *const ctx = static_cast<GameContext *>(context);
 
         CAllocator mainAllocator;
         Arena frameArena(&mainAllocator);
+
+        ctx->frameAllocator = &frameArena;
+        defer resetToNull = [ctx] { ctx->frameAllocator = nullptr; };
+
+        ctx->player->update(ctx, GetFrameTime());
 
         // TODO: fix our timestep
         // https://www.gafferongames.com/post/fix_your_timestep/
@@ -137,7 +148,7 @@ extern "C"
         if (ctx->trackingPlayer) {
             // TODO: not framerate dependent lerp?
             ctx->camera.target = Vector2Lerp(ctx->camera.target,
-                                             conv(ctx->square.position()), 0.1);
+                                             conv(ctx->player->position), 0.1);
 
             ctx->camera.offset = {
                 static_cast<float>(GetScreenWidth()) / 2.f,
@@ -148,11 +159,11 @@ extern "C"
                 getMouseDeltaInApp() * ctx->cameraDragSpeed / ctx->camera.zoom;
         }
 
-        if (isKeyPressedInApp(KEY_P)) {
+        if (isKeyJustPressedInApp(KEY_P)) {
             ctx->trackingPlayer = not ctx->trackingPlayer;
         }
 
-        if (isKeyPressedInApp(KEY_F)) {
+        if (isKeyJustPressedInApp(KEY_F)) {
 #ifndef __EMSCRIPTEN__ // fullscreen is broken on some older emscripten versions
             ToggleFullscreen();
 #endif
@@ -195,8 +206,7 @@ extern "C"
             debugDrawPhysicsBody(&frameArena, ctx->square, RED);
             debugDrawPhysicsBody(&frameArena, ctx->floor, GRAY);
 
-            DrawTexture(ctx->textureMissing, ctx->square.position().x,
-                        ctx->square.position().y, WHITE);
+            ctx->player->draw(ctx);
 
             DrawRectangle(50, 50, 100, 100, BLUE);
         }
