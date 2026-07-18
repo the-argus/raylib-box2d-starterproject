@@ -3,7 +3,6 @@
 
 #include "macros.h"
 
-#include <concepts>
 #include <functional> // std::invoke
 #include <type_traits>
 #include <utility>

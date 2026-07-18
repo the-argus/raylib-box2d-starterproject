@@ -11,7 +11,9 @@
 #include <imgui_impl_raylib.h>
 
 #include <chrono>
+#ifndef NO_HOTRELOAD
 #include <filesystem>
+#endif
 
 using TimePoint = std::chrono::time_point<std::chrono::system_clock>;
 using Duration =
@@ -29,10 +31,7 @@ constexpr Duration recompilationTimeout = std::chrono::seconds(2);
 constexpr float render_size[] = {800, 600};
 constexpr size_t fps = 60;
 
-#ifndef HOTRELOAD_LIB_PATH
-#define HOTRELOAD_LIB_PATH "(HOTRELOAD DISABLED)"
-#define NO_HOTRELOAD
-#else
+#ifndef NO_HOTRELOAD
 [[nodiscard]] static std::optional<std::filesystem::file_time_type>
 getMostRecentModifyTime(const char *sourceRootPath);
 [[nodiscard]] static bool scanForSourceChanges(const char *sourceRootPath,
@@ -116,7 +115,9 @@ static bool scanForSourceChanges(const char *sourceRootPath,
     }
 
     using T = std::remove_cvref_t<decltype(*sourceLastWriteTime)>;
-    return std::chrono::clock_cast<std::chrono::system_clock, T::clock, T::duration>(*sourceLastWriteTime) > lastRecompilationTime;
+    return std::chrono::clock_cast<std::chrono::system_clock, T::clock,
+                                   T::duration>(*sourceLastWriteTime) >
+           lastRecompilationTime;
 }
 #endif
 
@@ -129,8 +130,9 @@ void AppState::reloadIfNeeded()
         const auto dllLastWriteTime =
             std::filesystem::last_write_time(HOTRELOAD_LIB_PATH, errorCode);
         gameLib.unloadIfLoaded();
-        std::ignore = std::system("cmake --build " HOTRELOAD_BUILD_DIR
-                                  " --target " HOTRELOAD_LIB_TARGET " --config Debug");
+        std::ignore =
+            std::system("cmake --build " HOTRELOAD_BUILD_DIR
+                        " --target " HOTRELOAD_LIB_TARGET " --config Debug");
         if (!errorCode) {
             const auto recompiledDllLastWriteTime =
                 std::filesystem::last_write_time(HOTRELOAD_LIB_PATH, errorCode);

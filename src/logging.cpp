@@ -7,8 +7,8 @@
 #include <fmt/color.h>
 #include <fmt/core.h>
 
-#include <chrono>
 #include <array>
+#include <chrono>
 
 static_assert(static_cast<int>(LogLevel::Debug) == LOG_DEBUG);
 static_assert(static_cast<int>(LogLevel::Info) == LOG_INFO);

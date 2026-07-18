@@ -1,7 +1,7 @@
 #include "arena.h"
 
-#include <bit> // for std::bit_cast
 #include <algorithm> // for std::max
+#include <bit>       // for std::bit_cast
 #include <cstring>
 #include <memory> // for std::align
 

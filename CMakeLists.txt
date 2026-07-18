@@ -60,10 +60,6 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug" AND NOT MSVC)
   endif()
 endif()
 
-if(GAME_NO_HOTRELOAD)
-  target_compile_definitions(${PROJECT_NAME} PRIVATE NO_HOTRELOAD)
-endif()
-
 if (MSVC AND WIN32 AND NOT MSVC_VERSION VERSION_LESS 142)
     target_link_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:/INCREMENTAL>)
     target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:/ZI>)

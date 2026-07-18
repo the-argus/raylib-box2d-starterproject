@@ -1,11 +1,12 @@
 #ifndef __UHANDERS_GAME_LIB_H__
 #define __UHANDERS_GAME_LIB_H__
 
-#if defined(HOTRELOAD_LIB_PATH)
+#include "macros.h"
+
+#ifndef NO_HOTRELOAD
 #include "dlload.h"
 #include "logging.h"
 #endif
-#include "macros.h"
 
 #include <imgui.h>
 
@@ -25,11 +26,12 @@ using HotReloadedCallback = bool (*)(const GlobalContext *);
 using InitCallback = void *(*)();
 } // namespace hotreload
 
-#ifndef HOTRELOAD_LIB_PATH
+#ifdef NO_HOTRELOAD
 extern "C"
 {
     HOTRELOAD_EXPORT extern void *init();
-	HOTRELOAD_EXPORT extern void onHotReload(const hotreload::GlobalContext *context);
+    HOTRELOAD_EXPORT extern void
+    onHotReload(const hotreload::GlobalContext *context);
     HOTRELOAD_EXPORT extern bool frame(void *context);
 }
 #endif
@@ -38,7 +40,7 @@ class GameLib
 {
   private:
     const char *m_libPath;
-#if defined(HOTRELOAD_LIB_PATH)
+#ifndef NO_HOTRELOAD
     dlload::native::handle m_library = nullptr;
     hotreload::FrameCallback m_frameCallback = nullptr;
     hotreload::InitCallback m_initCallback = nullptr;
@@ -55,10 +57,10 @@ class GameLib
     GameLib &operator=(GameLib &&) = delete;
     GameLib &operator=(const GameLib &) = delete;
     ~GameLib() { unloadIfLoaded(); }
-	
+
     void unloadIfLoaded()
     {
-#if defined(HOTRELOAD_LIB_PATH)
+#ifndef NO_HOTRELOAD
         if (m_library) {
             dlload::close(m_library);
             m_library = nullptr;
@@ -76,7 +78,7 @@ class GameLib
 
         if (status)
             m_gameContext =
-#ifndef HOTRELOAD_LIB_PATH
+#ifdef NO_HOTRELOAD
                 ::init();
 #else
                 m_initCallback();
@@ -88,7 +90,7 @@ class GameLib
     /// Returns true on success and false on failure
     [[nodiscard]] bool reload()
     {
-#if defined(HOTRELOAD_LIB_PATH)
+#ifndef NO_HOTRELOAD
         unloadIfLoaded();
 
         m_library = dlload::open(m_libPath);
@@ -130,7 +132,7 @@ class GameLib
 
     [[nodiscard]] bool frame()
     {
-#if defined(HOTRELOAD_LIB_PATH)
+#ifndef NO_HOTRELOAD
         if (m_frameCallback) {
             return m_frameCallback(m_gameContext);
         }

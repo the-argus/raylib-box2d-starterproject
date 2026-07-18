@@ -1,7 +1,7 @@
 #include "box2d.h"
+#include "defer.h"
 #include "game_lib.h"
 #include "logging.h"
-#include "defer.h"
 
 #include <raylib.h>
 #include <rlImGui.h>
@@ -79,7 +79,8 @@ extern "C"
         defer rlEnd = [] { rlImGuiEnd(); };
 
         {
-            // ImGui::SetNextWindowSize(ImVec2{400, 400}); // TODO: only set this first frame, theres a flag
+            // ImGui::SetNextWindowSize(ImVec2{400, 400}); // TODO: only set
+            // this first frame, theres a flag
             ImGui::Begin("my window");
             defer end = [] { ImGui::End(); };
 

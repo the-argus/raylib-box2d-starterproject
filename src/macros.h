@@ -63,6 +63,11 @@ using f64 = double;
 static_assert(sizeof(f32) == 4);
 static_assert(sizeof(f64) == 8);
 
+#ifndef HOTRELOAD_LIB_PATH
+#define HOTRELOAD_LIB_PATH "(HOTRELOAD DISABLED)"
+#define NO_HOTRELOAD
+#endif
+
 #if defined(_WIN32) && !defined(NO_HOTRELOAD)
 #define HOTRELOAD_EXPORT __declspec(dllexport)
 #else

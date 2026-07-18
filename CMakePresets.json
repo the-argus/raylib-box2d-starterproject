@@ -27,7 +27,7 @@
       "displayName": "Visual Studio developer build without hot reload",
       "inherits": ["dev-base"],
       "cacheVariables": {
-        "GAME_NO_HOTRELOAD":  "ON"
+        "GAME_NO_HOTRELOAD": "ON"
       }
     },
     {
@@ -40,11 +40,11 @@
       }
     },
     {
-      "name": "debug-noreload",
-      "binaryDir": "${sourceDir}/build-${presetName}",
+      "name": "dev-noreload",
+      "inherits": ["dev-base"],
       "generator": "Ninja",
       "cacheVariables": {
-        "GAME_NO_HOTRELOAD":  "ON"
+        "GAME_NO_HOTRELOAD": "ON"
       }
     }
   ]

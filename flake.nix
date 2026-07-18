@@ -23,7 +23,7 @@
       pkgs = import nixpkgs {inherit system;};
     in {
       devShell =
-        pkgs.mkShell
+        (pkgs.mkShell.override {stdenv = pkgs.stdenv;})
         {
           packages =
             (with pkgs; [
