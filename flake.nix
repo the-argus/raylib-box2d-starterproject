@@ -29,6 +29,23 @@
             (with pkgs; [
               clang-tools # to get wrapped variant of clang-scan-deps
 
+              # this command tries to be smart about where its removing from since
+              # it does rm -rf. other commands will just fail, eh
+              (writeShellScriptBin "cleanall" ''
+                set -euo pipefail
+                root="$(${git}/bin/git rev-parse --show-toplevel)"
+                rm -rf "$root/vendor/.packages"
+                rm -rf "$root/build-dev"
+                rm -rf "$root/build-dev-noreload"
+                rm -rf "$root/build-release"
+              '')
+
+              (writeShellScriptBin "webbuild-deps" "cmake -DEMSCRIPTEN=ON -P ./vendor/package_manager.cmake")
+              (writeShellScriptBin "webconfigure" "emcmake cmake --preset dev-noreload")
+              (writeShellScriptBin "webbuild" "cmake --build build-dev-noreload --parallel")
+              (writeShellScriptBin "webrun" "emrun --port 8000 build-dev-noreload/underhanders.html")
+
+              (writeShellScriptBin "build-deps" "cmake -P ./vendor/package_manager.cmake")
               (writeShellScriptBin "configure" "cmake --preset dev")
               (writeShellScriptBin "build" "cmake --build build-dev --parallel")
               (writeShellScriptBin "run" "build && gdb build-dev/underhanders")
@@ -40,6 +57,8 @@
               cmake-format
               # tracy
               # renderdoc
+
+              emscripten
             ])
             ++ pkgs.lib.optionals (system != flake-utils.lib.system.aarch64-darwin) (with pkgs; [
               mold
