@@ -22,6 +22,7 @@ struct GlobalContext
 };
 
 using FrameCallback = bool (*)(void *ctx);
+using DeinitCallback = void (*)(void *ctx);
 using HotReloadedCallback = bool (*)(const GlobalContext *);
 using InitCallback = void *(*)();
 } // namespace hotreload
@@ -30,6 +31,7 @@ using InitCallback = void *(*)();
 extern "C"
 {
     HOTRELOAD_EXPORT extern void *init();
+    HOTRELOAD_EXPORT extern void deinit(void *);
     HOTRELOAD_EXPORT extern void
     onHotReload(const hotreload::GlobalContext *context);
     HOTRELOAD_EXPORT extern bool frame(void *context);
@@ -43,6 +45,7 @@ class GameLib
 #ifndef NO_HOTRELOAD
     dlload::native::handle m_library = nullptr;
     hotreload::FrameCallback m_frameCallback = nullptr;
+    hotreload::DeinitCallback m_deinitCallback = nullptr;
     hotreload::InitCallback m_initCallback = nullptr;
     hotreload::HotReloadedCallback m_onHotReloadCallback = nullptr;
 #endif
@@ -62,12 +65,18 @@ class GameLib
     {
 #ifndef NO_HOTRELOAD
         if (m_library) {
+            if (m_deinitCallback) {
+                m_deinitCallback(m_gameContext);
+            }
             dlload::close(m_library);
             m_library = nullptr;
             m_frameCallback = nullptr;
+            m_deinitCallback = nullptr;
             m_initCallback = nullptr;
             m_onHotReloadCallback = nullptr;
         }
+#else
+        ::deinit(m_gameContext);
 #endif
     }
 
@@ -115,6 +124,8 @@ class GameLib
         if (not load(m_frameCallback, "frame"))
             return false;
         if (not load(m_initCallback, "init"))
+            return false;
+        if (not load(m_deinitCallback, "deinit"))
             return false;
         if (not load(m_onHotReloadCallback, "onHotReload"))
             return false;

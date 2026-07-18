@@ -51,6 +51,12 @@ extern "C"
         return out;
     }
 
+    HOTRELOAD_EXPORT void deinit(void *context)
+    {
+        auto *const ctx = static_cast<Context *>(context);
+        delete ctx;
+    }
+
     HOTRELOAD_EXPORT void onHotReload(const hotreload::GlobalContext *context)
     {
         ImGui::SetCurrentContext(context->imguiContext);
