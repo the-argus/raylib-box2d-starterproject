@@ -1,13 +1,22 @@
 #include "arena.h"
 
 #include <algorithm> // for std::max
-#include <bit>       // for std::bit_cast
+#ifdef NDEBUG
+#include <bit> // for std::bit_cast
+#endif
 #include <cstring>
 #include <memory> // for std::align
+
+#ifndef NDEBUG
+#include <cstdlib> // for aligned_alloc + free
+#endif
 
 Result<Bytes, alloc::Error>
 Arena::impl_reallocate(const alloc::ReallocateRequest &options) NOEXCEPT
 {
+    if (options.inPlaceOrElseFail) [[unlikely]]
+        return alloc::Error::CouldntExpandInPlace;
+
     // just allocate a new block with the new size and do a copy
     Result allocation = this->allocate(alloc::Request{
         .numBytes = options.calculatePreferredSize(),
@@ -31,16 +40,19 @@ Arena::Arena(Bytes staticBuffer) NOEXCEPT : m_memory(staticBuffer),
 {
 }
 
-Arena::Arena(Allocator &backing_allocator) NOEXCEPT
+Arena::Arena(Allocator *backing_allocator) NOEXCEPT
     : m_memory({}),
       m_firstAvailableByteIndex(0),
-      m_backing(std::addressof(backing_allocator))
+      m_backing(backing_allocator)
 {
 }
 
 void Arena::destroy() NOEXCEPT
 {
     callAllDestructors(DestructorListClearMode::ClearAll);
+#ifndef NDEBUG
+    freeAllocationsAfter(nullptr);
+#endif
     if (m_backing && !m_memory.empty()) {
         m_backing->deallocate(m_memory.data());
     }
@@ -64,9 +76,49 @@ void Arena::callAllDestructors(DestructorListClearMode mode) NOEXCEPT
     m_lastPushedDestructor = nullptr;
 }
 
+#ifndef NDEBUG
+void Arena::freeAllocationsAfter(DebugAllocationListNode *stop) NOEXCEPT
+{
+    while (m_debugAllocations != stop) {
+        uassert(m_debugAllocations != nullptr);
+        DebugAllocationListNode *next = m_debugAllocations->next;
+        ::free(m_debugAllocations->memory);
+        ::free(m_debugAllocations);
+        m_debugAllocations = next;
+    }
+}
+#endif
+
 [[nodiscard]] Result<Bytes, alloc::Error>
 Arena::impl_allocate(const alloc::Request &request) NOEXCEPT
 {
+#ifndef NDEBUG
+    auto *node = static_cast<DebugAllocationListNode *>(
+        ::malloc(sizeof(DebugAllocationListNode)));
+    if (!node) [[unlikely]]
+        return alloc::Error::OOM;
+
+    const size_t align = request.alignment < alignof(std::max_align_t)
+                             ? alignof(std::max_align_t)
+                             : request.alignment;
+    // aligned_alloc requires size be a multiple of alignment.
+    const size_t size = (request.numBytes + align - 1) / align * align;
+
+    void *mem = ::aligned_alloc(align, size);
+    if (not mem) [[unlikely]] {
+        ::free(node);
+        return alloc::Error::OOM;
+    }
+
+    uassert(reinterpret_cast<uintptr_t>(mem) % request.alignment == 0);
+    ::memset(mem, 0, request.numBytes);
+
+    node->memory = mem;
+    node->next = m_debugAllocations;
+    m_debugAllocations = node;
+
+    return Bytes(static_cast<u8 *>(mem), request.numBytes);
+#else
     using namespace alloc;
     constexpr auto extraBookkeepingBytes = 100;
     // handle first-time allocation case
@@ -171,6 +223,7 @@ Arena::impl_allocate(const alloc::Request &request) NOEXCEPT
 
     ::memset(alignedStart, 0, request.numBytes);
     return Bytes(alignedStart, request.numBytes);
+#endif
 }
 
 [[nodiscard]] void *Arena::impl_arenaNewScope() NOEXCEPT
@@ -181,15 +234,24 @@ Arena::impl_allocate(const alloc::Request &request) NOEXCEPT
     // won't work. That's fine because we will OOM after this anyways
     if (isSuccess(destructor)) [[likely]]
         impl_arenaPushDestructor(destructor.value());
+
+#ifndef NDEBUG
+    return static_cast<void *>(m_debugAllocations);
+#else
     return std::bit_cast<void *>(m_firstAvailableByteIndex);
+#endif
 }
 
 void Arena::impl_arenaRestoreScope(void *handle) NOEXCEPT
 {
     callAllDestructors(DestructorListClearMode::StopAfterCurrentScope);
+#ifndef NDEBUG
+    freeAllocationsAfter(static_cast<DebugAllocationListNode *>(handle));
+#else
     uassert(m_firstAvailableByteIndex < m_memory.size());
     m_firstAvailableByteIndex = std::bit_cast<usize>(handle);
     uassert(m_firstAvailableByteIndex < m_memory.size());
+#endif
 }
 
 void Arena::impl_arenaPushDestructor(DestructorBase &destructor) NOEXCEPT
@@ -202,6 +264,8 @@ void Arena::clear() NOEXCEPT
 {
     callAllDestructors(DestructorListClearMode::ClearAll);
 #ifndef NDEBUG
+    freeAllocationsAfter(nullptr);
+#else
     memset(m_memory.data(), 0x69, m_memory.size_bytes());
     // memfill(m_memory, 0x69);
 #endif

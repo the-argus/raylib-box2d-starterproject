@@ -8,7 +8,7 @@ class Arena : public Allocator
 {
   public:
     explicit Arena(Bytes static_buffer) NOEXCEPT;
-    explicit Arena(Allocator &backing_allocator) NOEXCEPT;
+    explicit Arena(Allocator *backing_allocator) NOEXCEPT;
 
     Arena(Arena &&other) = delete;
     Arena &operator=(Arena &&other) = delete;
@@ -48,6 +48,17 @@ class Arena : public Allocator
 
     void destroy() NOEXCEPT;
     void callAllDestructors(DestructorListClearMode mode) NOEXCEPT;
+
+#ifndef NDEBUG
+    struct DebugAllocationListNode
+    {
+        void *memory;
+        DebugAllocationListNode *next;
+    };
+    // nullptr means free everything
+    void freeAllocationsAfter(DebugAllocationListNode *stop) NOEXCEPT;
+    DebugAllocationListNode *m_debugAllocations = nullptr;
+#endif
 
     Bytes m_memory;
     usize m_firstAvailableByteIndex;
