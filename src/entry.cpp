@@ -78,6 +78,7 @@ extern "C"
         rlImGuiBegin();
         defer rlEnd = [] { rlImGuiEnd(); };
 
+        bool keepRunning = true;
         {
             // ImGui::SetNextWindowSize(ImVec2{400, 400}); // TODO: only set
             // this first frame, theres a flag
@@ -87,8 +88,11 @@ extern "C"
             if (ImGui::Button("testing button")) {
                 fmt::println("testing 3...");
             }
+            if (ImGui::Button("Quit")) {
+                keepRunning = false;
+            }
         }
 
-        return true;
+        return keepRunning;
     }
 }

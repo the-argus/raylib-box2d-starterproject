@@ -118,9 +118,10 @@ Arena::impl_allocate(const alloc::Request &request) NOEXCEPT
 
             auto maybeNewMemory = backing.reallocate(ReallocateRequest{
                 .memory = m_memory,
-                .newSizeBytes = std::max(m_memory.size() * growth_factor,
-                                         m_memory.size() + request.numBytes +
-                                             extraBookkeepingBytes),
+                .newSizeBytes = std::max(
+                    static_cast<u64>(m_memory.size() * growth_factor),
+                    static_cast<u64>(m_memory.size() + request.numBytes +
+                                     extraBookkeepingBytes)),
                 .inPlaceOrElseFail = true,
             });
 
@@ -187,7 +188,7 @@ void Arena::impl_arenaRestoreScope(void *handle) NOEXCEPT
 {
     callAllDestructors(DestructorListClearMode::StopAfterCurrentScope);
     uassert(m_firstAvailableByteIndex < m_memory.size());
-    m_firstAvailableByteIndex = std::bit_cast<size_t>(handle);
+    m_firstAvailableByteIndex = std::bit_cast<usize>(handle);
     uassert(m_firstAvailableByteIndex < m_memory.size());
 }
 

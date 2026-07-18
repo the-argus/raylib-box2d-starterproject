@@ -1,4 +1,7 @@
-#include "defer.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
 #include "game_lib.h"
 #include "logging.h"
 
@@ -21,7 +24,7 @@ using Duration =
 
 struct AppState
 {
-    GameLib gameLib;
+    GameLib gameLib{HOTRELOAD_LIB_PATH};
     TimePoint lastHotreloadRecompileTime = std::chrono::system_clock::now();
 
     void reloadIfNeeded();
@@ -30,6 +33,43 @@ struct AppState
 constexpr Duration recompilationTimeout = std::chrono::seconds(2);
 constexpr float render_size[] = {800, 600};
 constexpr size_t fps = 60;
+
+static std::unique_ptr<AppState> state;
+
+#ifdef __EMSCRIPTEN__
+EM_JS(void, emsc_show_restart, (void), {
+    /* See the shell.html file for what this does to the webpage */
+    if (Module.showRestart)
+        Module.showRestart();
+});
+EMSCRIPTEN_KEEPALIVE extern "C" void emsc_set_window_size(int width, int height)
+{
+    SetWindowSize(width, height);
+}
+#endif
+
+void deinit()
+{
+    rlImGuiShutdown();
+    CloseWindow();
+}
+
+void update()
+{
+    state->reloadIfNeeded();
+
+    const bool shouldContinue = state->gameLib.frame();
+
+    if (!shouldContinue) {
+        deinit();
+#ifdef __EMSCRIPTEN__
+        emscripten_cancel_main_loop();
+        emsc_show_restart();
+#else
+        state = {}; // main loop checks if this is null and then exits
+#endif
+    }
+}
 
 #ifndef NO_HOTRELOAD
 [[nodiscard]] static std::optional<std::filesystem::file_time_type>
@@ -42,9 +82,9 @@ int main()
 {
     SetTraceLogCallback(detail::logCallback);
 
-    AppState state{GameLib(HOTRELOAD_LIB_PATH)};
+    state = std::make_unique<AppState>();
 
-    if (not state.gameLib.firstLoad()) {
+    if (not state->gameLib.firstLoad()) {
         LOGERROR_MSG(Hotreload,
                      "Failed to load gamelib " HOTRELOAD_LIB_PATH " initially");
         return EXIT_FAILURE;
@@ -52,22 +92,24 @@ int main()
 
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(420, 720, "Underhanders");
-    defer closeWindow = [] { CloseWindow(); };
 
     SetTargetFPS(144);
 
     rlImGuiSetup(true);
-    defer closeRlImGui = [] { rlImGuiShutdown(); };
 
-    while (!WindowShouldClose()) {
-        state.reloadIfNeeded();
-
-        const bool shouldContinue = state.gameLib.frame();
-
-        if (!shouldContinue) {
-            break;
-        }
+#ifdef __EMSCRIPTEN__
+    emscripten_set_main_loop(
+        update,
+        /* fps=0 means vsync */
+        0,
+        /* simulate_infinite_loop=1 means the browser does
+         * requestAnimationFrame, basically needed for vsync as well*/
+        1);
+#else
+    while (!WindowShouldClose() && state) {
+        update();
     }
+#endif
 }
 
 #ifndef NO_HOTRELOAD

@@ -50,7 +50,7 @@ class Arena : public Allocator
     void callAllDestructors(DestructorListClearMode mode) NOEXCEPT;
 
     Bytes m_memory;
-    u64 m_firstAvailableByteIndex;
+    usize m_firstAvailableByteIndex;
     Allocator *m_backing = nullptr;
     DestructorBase *m_lastPushedDestructor = nullptr;
 };

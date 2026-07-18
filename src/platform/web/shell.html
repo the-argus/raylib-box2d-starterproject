@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta http-equiv="cache-control" content="no-cache" />
+    <meta http-equiv="expires" content="0" />
+    <title>demo</title>
+    <link rel="shortcut icon" href="/assets/_favicon.ico" />
+
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden; /* no scrollbars */
+        background-color: rgb(42, 42, 42);
+      }
+
+      canvas.emscripten {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+        border: 0 none;
+        background-color: transparent;
+      }
+
+      /* restart screen visible after game exits */
+      #restart-overlay {
+        display: none;
+        position: fixed;
+        inset: 0; /* fill viewport */
+        align-items: center;
+        justify-content: center;
+        background: rgba(42, 42, 42, 0.85);
+        font:
+          600 20px system-ui,
+          sans-serif;
+      }
+      #restart-overlay.visible {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      #restart-button {
+        padding: 14px 28px;
+        border: 0;
+        border-radius: 8px;
+        cursor: pointer;
+        background: #ffffff;
+        color: #111;
+        font:
+          600 20px system-ui,
+          sans-serif;
+      }
+      #restart-button:hover {
+        background: #fff;
+      }
+    </style>
+  </head>
+
+  <body>
+    <canvas
+      class="emscripten"
+      id="canvas"
+      oncontextmenu="event.preventDefault()"
+      tabindex="-1"
+    ></canvas>
+
+    <div id="restart-overlay">
+      <div>game module closed down</div>
+      <button id="restart-button" onclick="location.reload()">restart?</button>
+    </div>
+
+    <script>
+      var Module = {
+        print: (function () {
+          return function (text) {
+            if (arguments.length > 1)
+              text = Array.prototype.slice.call(arguments).join(" ");
+            console.log(text);
+          };
+        })(),
+        canvas: document.getElementById("canvas"),
+      };
+
+      function currentSize() {
+        return [
+          document.documentElement.clientWidth,
+          document.documentElement.clientHeight,
+        ];
+      }
+
+      Module.onRuntimeInitialized = function () {
+        Module.resizeWindow = function (w, h) {
+          Module.ccall(
+            "emsc_set_window_size",
+            null,
+            ["number", "number"],
+            [w, h],
+          );
+        };
+        var apply = function () {
+          var s = currentSize();
+          Module.resizeWindow(s[0], s[1]);
+        };
+        apply();
+        window.addEventListener("resize", apply);
+
+        // called from main.cpp
+        Module.showRestart = function () {
+          document.getElementById("restart-overlay").classList.add("visible");
+        };
+      };
+    </script>
+
+    {{{ SCRIPT }}}
+  </body>
+</html>

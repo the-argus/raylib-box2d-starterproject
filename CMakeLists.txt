@@ -10,17 +10,41 @@ if(EXISTS ${PACKAGESOURCE})
   foreach(PREFIX_PATH_ENTRY ${ADDITIONAL_PREFIX_PATH})
     message(STATUS "Adding ${PREFIX_PATH_ENTRY} to CMAKE_PREFIX_PATH")
     list(APPEND CMAKE_PREFIX_PATH "${PREFIX_PATH_ENTRY}")
+    if(EMSCRIPTEN)
+      message(STATUS "Adding ${PREFIX_PATH_ENTRY} to CMAKE_FIND_ROOT_PATH")
+      list(APPEND CMAKE_FIND_ROOT_PATH "${PREFIX_PATH_ENTRY}")
+    endif()
   endforeach()
 endif()
 
-set(HOTRELOAD_DEFAULT CMAKE_BUILD_TYPE MATCHES "Debug")
+if(CMAKE_BUILD_TYPE MATCHES "Debug" AND NOT EMSCRIPTEN)
+  set(NO_HOTRELOAD_DEFAULT OFF)
+else()
+  set(NO_HOTRELOAD_DEFAULT ON)
+endif()
 
-option(GAME_NO_HOTRELOAD "Whether to build a separate dynamic library of game code and check for changes in main code" $HOTRELOAD_DEFAULT)
+message(
+  "Build type is ${CMAKE_BUILD_TYPE}, *not* using hotreload: ${NO_HOTRELOAD_DEFAULT}..."
+)
 
-find_program(MOLD_PROGRAM mold)
-if(MOLD_PROGRAM)
-  set(CMAKE_LINKER_TYPE MOLD)
-  message(STATUS "mold found: ${MOLD_PROGRAM}")
+option(
+  GAME_NO_HOTRELOAD
+  "Disable building code into a separate library that gets reloaded on code change"
+  ${NO_HOTRELOAD_DEFAULT})
+
+if(NOT GAME_NO_HOTRELOAD AND EMSCRIPTEN)
+  message(
+    FATAL_ERROR
+      "Cannot specify GAME_NO_HOTRELOAD=OFF and build for emscripten target, shared libraries don't work under emscripten."
+  )
+endif()
+
+if(NOT CMAKE_SYSTEM_NAME MATCHES "Emscripten")
+  find_program(MOLD_PROGRAM mold)
+  if(MOLD_PROGRAM)
+    set(CMAKE_LINKER_TYPE MOLD)
+    message(STATUS "mold found: ${MOLD_PROGRAM}")
+  endif()
 endif()
 
 set(common_source_files src/logging.cpp)
@@ -55,23 +79,34 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug" AND NOT MSVC)
   target_link_options(${PROJECT_NAME} PRIVATE ${DEBUG_LINK_OPTIONS})
 
   if(NOT GAME_NO_HOTRELOAD)
-	  target_compile_options(${PROJECT_NAME}_lib PRIVATE ${DEBUG_COMPILE_OPTIONS})
-	  target_link_options(${PROJECT_NAME}_lib PRIVATE ${DEBUG_LINK_OPTIONS})
+    target_compile_options(${PROJECT_NAME}_lib PRIVATE ${DEBUG_COMPILE_OPTIONS})
+    target_link_options(${PROJECT_NAME}_lib PRIVATE ${DEBUG_LINK_OPTIONS})
   endif()
 endif()
 
-if (MSVC AND WIN32 AND NOT MSVC_VERSION VERSION_LESS 142)
-    target_link_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:/INCREMENTAL>)
-    target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:/ZI>)
+if(MSVC
+   AND WIN32
+   AND NOT MSVC_VERSION VERSION_LESS 142)
+  target_link_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:/INCREMENTAL>)
+  target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:/ZI>)
 
-    if(NOT GAME_NO_HOTRELOAD)
-		target_link_options(${PROJECT_NAME}_lib PRIVATE $<$<CONFIG:Debug>:/INCREMENTAL>)
-		target_compile_options(${PROJECT_NAME}_lib PRIVATE $<$<CONFIG:Debug>:/ZI>)
-    endif()
+  if(NOT GAME_NO_HOTRELOAD)
+    target_link_options(${PROJECT_NAME}_lib PRIVATE
+                        $<$<CONFIG:Debug>:/INCREMENTAL>)
+    target_compile_options(${PROJECT_NAME}_lib PRIVATE $<$<CONFIG:Debug>:/ZI>)
+  endif()
 endif()
 
 if(CMAKE_BUILD_TYPE MATCHES "Release")
   target_compile_definitions(${PROJECT_NAME} PRIVATE ASSERTS_DISABLED)
+endif()
+
+if(EMSCRIPTEN)
+  set(SHELL_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/web/shell.html")
+  set_target_properties(${PROJECT_NAME} PROPERTIES LINK_DEPENDS "${SHELL_FILE}")
+  set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX ".html")
+  target_link_options(${PROJECT_NAME} PRIVATE -sUSE_GLFW=3
+                      -sALLOW_MEMORY_GROWTH --shell-file "${SHELL_FILE}")
 endif()
 
 set_target_properties(
@@ -104,14 +139,17 @@ find_package(fmt REQUIRED NO_CMAKE_SYSTEM_PATH)
 target_link_libraries(${PROJECT_NAME} raylib imgui::imgui fmt::fmt box2d::box2d)
 
 if(NOT GAME_NO_HOTRELOAD)
-  target_link_libraries(${PROJECT_NAME}_lib raylib imgui::imgui fmt::fmt box2d::box2d)
+  target_link_libraries(${PROJECT_NAME}_lib raylib imgui::imgui fmt::fmt
+                        box2d::box2d)
 endif()
 
 # on windows, copy all DLLs into build result folder
 if(WIN32)
-  add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    $<TARGET_RUNTIME_DLLS:${PROJECT_NAME}>
-    $<TARGET_FILE_DIR:${PROJECT_NAME}>
+  add_custom_command(
+    TARGET ${PROJECT_NAME}
+    POST_BUILD
+    COMMAND
+      ${CMAKE_COMMAND} -E copy_if_different
+      $<TARGET_RUNTIME_DLLS:${PROJECT_NAME}> $<TARGET_FILE_DIR:${PROJECT_NAME}>
     COMMAND_EXPAND_LISTS)
 endif()
