@@ -6,7 +6,6 @@
       "name": "dev-base",
       "hidden": true,
       "binaryDir": "${sourceDir}/build-${presetName}",
-      "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_BUILD_TYPE": "Debug"
@@ -14,8 +13,22 @@
     },
     {
       "name": "dev",
+      "generator": "Ninja",
       "displayName": "Developer build",
       "inherits": ["dev-base"]
+    },
+    {
+      "name": "vs-dev",
+      "displayName": "Visual Studio developer build",
+      "inherits": ["dev-base"]
+    },
+    {
+      "name": "vs-dev-noreload",
+      "displayName": "Visual Studio developer build without hot reload",
+      "inherits": ["dev-base"],
+      "cacheVariables": {
+        "GAME_NO_HOTRELOAD":  "ON"
+      }
     },
     {
       "name": "release",

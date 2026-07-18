@@ -84,7 +84,7 @@ extern "C"
             defer end = [] { ImGui::End(); };
 
             if (ImGui::Button("testing button")) {
-                printf("testing...\n");
+                fmt::println("testing 3...");
             }
         }
 

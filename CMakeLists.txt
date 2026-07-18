@@ -64,6 +64,16 @@ if(GAME_NO_HOTRELOAD)
   target_compile_definitions(${PROJECT_NAME} PRIVATE NO_HOTRELOAD)
 endif()
 
+if (MSVC AND WIN32 AND NOT MSVC_VERSION VERSION_LESS 142)
+    target_link_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:/INCREMENTAL>)
+    target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:/ZI>)
+
+    if(NOT GAME_NO_HOTRELOAD)
+		target_link_options(${PROJECT_NAME}_lib PRIVATE $<$<CONFIG:Debug>:/INCREMENTAL>)
+		target_compile_options(${PROJECT_NAME}_lib PRIVATE $<$<CONFIG:Debug>:/ZI>)
+    endif()
+endif()
+
 if(CMAKE_BUILD_TYPE MATCHES "Release")
   target_compile_definitions(${PROJECT_NAME} PRIVATE ASSERTS_DISABLED)
 endif()
