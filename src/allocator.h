@@ -167,7 +167,7 @@ class Allocator
         uassert(u64(objectStart) % alignof(T) == 0,
                 "Misaligned memory produced by allocator");
 
-        T *made = reinterpret_cast<T *>(objectStart);
+        T *made = std::launder(reinterpret_cast<T *>(objectStart));
 
         std::construct_at(made, std::forward<Args>(args)...);
 
@@ -182,14 +182,17 @@ class Allocator
     };
 
     constexpr virtual void
-    impl_arenaPushDestructor(DestructorBase &entry) NOEXCEPT = 0;
+    impl_arenaPushDestructor(DestructorBase &entry) NOEXCEPT {};
 
     [[nodiscard]] constexpr virtual Result<Bytes, alloc::Error>
     impl_allocate(const alloc::Request &) NOEXCEPT = 0;
 
-    [[nodiscard]] constexpr virtual void *impl_arenaNewScope() NOEXCEPT = 0;
+    [[nodiscard]] constexpr virtual void *impl_arenaNewScope() NOEXCEPT
+    {
+        return nullptr;
+    };
 
-    constexpr virtual void impl_arenaRestoreScope(void *handle) NOEXCEPT = 0;
+    constexpr virtual void impl_arenaRestoreScope(void *handle) NOEXCEPT {}
 
     constexpr virtual void impl_deallocate(void *memory,
                                            size_t size_hint) NOEXCEPT = 0;
@@ -202,6 +205,62 @@ template <typename T>
 concept AllocatorType = requires {
     requires std::is_base_of_v<Allocator, T>;
     requires std::is_convertible_v<T &, Allocator &>;
+};
+
+/// Basic allocator implementation for doing malloc() and free()
+class CAllocator : public Allocator
+{
+  public:
+    CAllocator() NOEXCEPT = default;
+    CAllocator(Allocator *) NOEXCEPT;
+
+    CAllocator(CAllocator &&other) = delete;
+    CAllocator &operator=(CAllocator &&other) = delete;
+
+    CAllocator &operator=(const CAllocator &) = delete;
+    CAllocator(const CAllocator &) = delete;
+
+  protected:
+    [[nodiscard]] constexpr Result<Bytes, alloc::Error>
+    impl_allocate(const alloc::Request &request) NOEXCEPT final
+    {
+        uassert(
+            request.alignment <= 16,
+            "Alignment requested larger than malloc, TODO allow aligning more");
+        if (request.alignment > 16) {
+            return alloc::Error::Unsupported;
+        }
+        void *allocated = ::malloc(request.numBytes);
+        if (not allocated) {
+            return alloc::Error::OOM;
+        }
+        return Bytes(static_cast<u8 *>(allocated), request.numBytes);
+    }
+
+    constexpr void impl_deallocate(void *memory,
+                                   size_t size_hint) NOEXCEPT final
+    {
+        ::free(memory);
+    }
+
+    constexpr Result<Bytes, alloc::Error>
+    impl_reallocate(const alloc::ReallocateRequest &options) NOEXCEPT final
+    {
+        if (not options.is_valid()) [[unlikely]]
+            return alloc::Error::Usage;
+        uassert(options.alignment <= 16, "alignment too big for realloc");
+        uassert(!options.inPlaceOrElseFail,
+                "realloc doesn't support inPlaceOrElseFail");
+        if (options.inPlaceOrElseFail || options.alignment > 16) [[unlikely]]
+            return alloc::Error::Unsupported;
+
+        void *result =
+            ::realloc(options.memory.data(), options.calculatePreferredSize());
+        if (!result) [[unlikely]]
+            return alloc::Error::OOM;
+        return Bytes(static_cast<u8 *>(result),
+                     options.calculatePreferredSize());
+    }
 };
 
 #endif
