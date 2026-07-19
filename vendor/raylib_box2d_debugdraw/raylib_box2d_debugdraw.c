@@ -60,22 +60,30 @@ static void DrawPolygonFcn(b2WorldTransform transform, const b2Vec2* vertices, i
 
 /// Draw a solid closed polygon provided in CCW order.
 static void DrawSolidPolygonFcn(b2Transform transform, const b2Vec2* vertices, int vertexCount, float radius, b2HexColor b2color, void* context) {
-	// First setup transformed vertices in CW order
-	Vector2 transformed_vertices[vertexCount + 1];
+	b2RaylibDebugDrawConfig* drawConfig = get_draw_config(context);
+
+	if (vertexCount == 0 || drawConfig == NULL)
+		return;
+
+	if (vertexCount > RAYLIB_BOX2D_DEBUG_DRAW_MAX_POINTS)
+		// would print a warning here but no access to logger
+		vertexCount = RAYLIB_BOX2D_DEBUG_DRAW_MAX_POINTS;
+
+	// put vertices in CW order
 	for (int i = 0; i < vertexCount; i++) {
 		b2Vec2 cw_vertex = vertices[vertexCount - 1 - i];
 		b2Vec2 transformed_vertex = b2TransformPoint(transform, cw_vertex);
-		transformed_vertices[i] = to_raylib_vector2(transformed_vertex);
+		drawConfig->pointsBuffer[i] = transformed_vertex;
 	}
 	// Close the triangle strip with a copy of the first vertex
-	transformed_vertices[vertexCount] = transformed_vertices[0];
+	drawConfig->pointsBuffer[vertexCount] = drawConfig->pointsBuffer[0];
 
 	Color color = to_raylib_color(b2color);
-	DrawTriangleStrip(transformed_vertices, vertexCount + 1, color);
+	DrawTriangleStrip((const Vector2*)&drawConfig->pointsBuffer[0], vertexCount + 1, color);
 
 	if (radius > 0) {
 		for (int i = 0; i < vertexCount; i++) {
-			DrawSolidCapsuleFcn(to_b2Vec2(transformed_vertices[i]), to_b2Vec2(transformed_vertices[i + 1]), radius, b2color, context);
+			DrawSolidCapsuleFcn(drawConfig->pointsBuffer[i], drawConfig->pointsBuffer[i + 1], radius, b2color, context);
 		}
 	}
 }
