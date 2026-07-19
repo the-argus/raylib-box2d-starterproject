@@ -25,7 +25,7 @@ std::tuple<b2::ShapeProxy, b2::Vec2>
 makeGroundCheckShapecastProxy(const b2::Capsule &capsule)
 {
     using namespace b2;
-    const f32 pogoRestLength = 3.0f * capsule.radius;
+    const f32 pogoRestLength = 0.02f;
     const f32 rayLength = pogoRestLength + capsule.radius;
 
     ShapeProxy proxy = {};
