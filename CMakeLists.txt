@@ -52,7 +52,7 @@ set(hotreloaded_source_files
     src/entry.cpp src/arena.cpp src/assets.cpp src/player.cpp
     vendor/raylib_box2d_debugdraw/raylib_box2d_debugdraw.c)
 set(main_source_files src/main.cpp)
-set(include_directories src/ vendor/raylib_box2d_debug_draw)
+set(include_directories src/ vendor/raylib_box2d_debugdraw)
 
 # the game may run `cmake --build HOTRELOAD_BUILD_DIR --target
 # HOTRELOAD_LIB_TARGET` in debug mode, and re-link to it

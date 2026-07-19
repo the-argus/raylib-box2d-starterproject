@@ -13,62 +13,23 @@
 #include <raymath.h>
 #include <rlImGui.h>
 
-void debugDrawPhysicsBody(Allocator *allocator, b2::Body body, Color color)
-{
-    auto shapes = body.shapesErr(allocator);
-    if (shapes.isError()) {
-        LOGWARN(Renderer, "failed to debug draw shape, error {}",
-                static_cast<int>(shapes.error()));
-        return;
-    }
+#include <raylib_box2d_debugdraw.h>
 
-    for (const b2::Shape &shape : shapes.value()) {
-        switch (shape.type()) {
-        case b2::ShapeType::Segment: {
-            auto segment = shape.segment();
-            DrawLineEx(conv(segment.point1), conv(segment.point2), 1.f, color);
-            break;
-        }
-        case b2::ShapeType::Capsule: {
-            auto capsule = shape.capsule();
-            DrawCircleLines(capsule.center1.x, capsule.center1.y,
-                            capsule.radius, color);
-            DrawCircleLines(capsule.center2.x, capsule.center2.y,
-                            capsule.radius, color);
-            Vector2 start{capsule.center1.x, capsule.center1.y};
-            Vector2 end{capsule.center2.x, capsule.center2.y};
-            DrawLineEx(start, end, capsule.radius, color);
-            break;
-        }
-        case b2::ShapeType::Polygon: {
-            auto polygon = shape.polygon();
-            std::array<Vector2, 9> raylibFormat{};
-            static_assert(sizeof(raylibFormat) ==
-                          sizeof(polygon.vertices) + sizeof(Vector2));
-            auto iter = raylibFormat.begin();
-            for (b2::Vec2 vert : polygon.vertices) {
-                uassert(iter != raylibFormat.end());
-                iter->x = vert.x;
-                iter->y = vert.y;
-                ++iter;
-            }
-            raylibFormat.back() = raylibFormat.front(); // loop lines
-            DrawLineStrip(raylibFormat.data(),
-                          static_cast<int>(raylibFormat.size()), color);
-            break;
-        }
-        case b2::ShapeType::Circle: {
-            auto circle = shape.circle();
-            DrawCircleLines(circle.center.x, circle.center.y, circle.radius,
-                            color);
-            break;
-        }
-        case b2::ShapeType::ChainSegment: {
-            /* unused */
-            break;
-        }
-        }
-    }
+void debugDrawBox2dWorld(b2::World world, b2RaylibDebugDrawConfig *config)
+{
+    auto debugDrawer = b2RaylibDebugDraw();
+
+    debugDrawer.drawBodyNames = true;
+    debugDrawer.drawShapes = true;
+    debugDrawer.drawBounds = true;
+    debugDrawer.drawContacts = true;
+    debugDrawer.drawContactNormals = true;
+    debugDrawer.drawContactForces = true;
+    debugDrawer.drawMass = true;
+
+    debugDrawer.context = config;
+
+    b2World_Draw(world, &debugDrawer);
 }
 
 extern "C"
@@ -100,9 +61,14 @@ extern "C"
         };
 
         Result player = out->gameAllocator.make<Player>();
-        if (!player)
+        Result debugDrawConfig =
+            out->gameAllocator.make<b2RaylibDebugDrawConfig>();
+        if (!player || !debugDrawConfig)
             LOGFATAL_MSG(Gameplay, "OOM");
+
         out->player = &player.value();
+        out->debugDrawConfig = &debugDrawConfig.value();
+        b2DefaultRaylibDebugDrawConfig(out->debugDrawConfig);
 
         out->square.addPolygonShape({}, b2MakeSquare(1.f));
         out->floor.addSegmentShape({}, {.point1 = {-10, 0}, .point2 = {10, 0}});
@@ -203,8 +169,7 @@ extern "C"
             BeginMode2D(ctx->camera);
             defer endMode2D = [] { EndMode2D(); };
 
-            debugDrawPhysicsBody(&frameArena, ctx->square, RED);
-            debugDrawPhysicsBody(&frameArena, ctx->floor, GRAY);
+            debugDrawBox2dWorld(ctx->world, ctx->debugDrawConfig);
 
             ctx->player->draw(ctx);
 

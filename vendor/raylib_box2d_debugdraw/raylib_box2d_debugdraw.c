@@ -26,22 +26,36 @@ static b2Vec2 to_b2Vec2(Vector2 rlvec) {
 	return b2vec;
 }
 
-static b2RaylibDebugDrawConfig get_draw_config(void *context) {
+static b2RaylibDebugDrawConfig* get_draw_config(void *context) {
 	if (context) {
-		return *(b2RaylibDebugDrawConfig *) context;
+		return (b2RaylibDebugDrawConfig *) context;
 	}
-	else {
-		return b2DefaultRaylibDebugDrawConfig();
-	}
+	return NULL;
 }
 
 static void DrawSolidCapsuleFcn(b2Vec2 b2p1, b2Vec2 b2p2, float radius, b2HexColor b2color, void* context);
 
 /// Draw a closed polygon provided in CCW order.
-static void DrawPolygonFcn(const b2Vec2* vertices, int vertexCount, b2HexColor b2color, void* context) {
+static void DrawPolygonFcn(b2WorldTransform transform, const b2Vec2* vertices, int vertexCount, b2HexColor b2color, void* context) {
+	int numPoints = 0;
 	Color color = to_raylib_color(b2color);
-	DrawLineStrip((const Vector2 *) vertices, vertexCount, color);
-	DrawLineV(to_raylib_vector2(vertices[vertexCount - 1]), to_raylib_vector2(vertices[0]), color);
+	b2RaylibDebugDrawConfig* drawConfig = get_draw_config(context);
+
+	if (vertexCount == 0 || drawConfig == NULL)
+		return;
+
+	if (vertexCount > RAYLIB_BOX2D_DEBUG_DRAW_MAX_POINTS)
+		// would print a warning here but no access to logger
+		vertexCount = RAYLIB_BOX2D_DEBUG_DRAW_MAX_POINTS; 
+
+	for (int i = 0; i < vertexCount; ++i) {
+		drawConfig->pointsBuffer[i] = b2TransformPoint(transform, vertices[i]);
+	}
+
+	DrawLineStrip((const Vector2 *) drawConfig->pointsBuffer, vertexCount, color);
+	if (vertexCount > 2) {
+		DrawLineV(to_raylib_vector2(drawConfig->pointsBuffer[vertexCount - 1]), to_raylib_vector2(drawConfig->pointsBuffer[0]), color);
+	}
 }
 
 /// Draw a solid closed polygon provided in CCW order.
@@ -73,10 +87,9 @@ static void DrawCircleFcn(b2Vec2 center, float radius, b2HexColor b2color, void*
 }
 
 /// Draw a solid circle.
-static void DrawSolidCircleFcn(b2Transform transform, float radius, b2HexColor b2color, void* context) {
+static void DrawSolidCircleFcn(b2Transform transform, b2Vec2 center, float radius, b2HexColor b2color, void* context) {
 	Color color = to_raylib_color(b2color);
-	Vector2 center = to_raylib_vector2(transform.p);
-	DrawCircleV(center, radius, color);
+	DrawCircleV(to_raylib_vector2(center), radius, color);
 }
 
 /// Draw a solid capsule.
@@ -103,22 +116,24 @@ static void DrawSolidCapsuleFcn(b2Vec2 p1, b2Vec2 p2, float radius, b2HexColor b
 }
 
 /// Draw a line segment.
-static void DrawSegmentFcn(b2Vec2 p1, b2Vec2 p2, b2HexColor b2color, void* context) {
+static void DrawLineFcn(b2Vec2 p1, b2Vec2 p2, b2HexColor b2color, void* context) {
 	Color color = to_raylib_color(b2color);
 	DrawLineV(to_raylib_vector2(p1), to_raylib_vector2(p2), color);
 }
 
 /// Draw a transform. Choose your own length scale.
 static void DrawTransformFcn(b2Transform transform, void* context) {
-	b2RaylibDebugDrawConfig config = get_draw_config(context);
+	b2RaylibDebugDrawConfig* config = get_draw_config(context);
+	if (!config)
+		return;
 
-	b2Vec2 x_vec = { config.transformLength, 0 };
+	b2Vec2 x_vec = { config->transformLength, 0 };
 	b2Vec2 transformed_x = b2TransformPoint(transform, x_vec);
-	DrawLineV(to_raylib_vector2(transform.p), to_raylib_vector2(transformed_x), config.transformColorX);
+	DrawLineV(to_raylib_vector2(transform.p), to_raylib_vector2(transformed_x), config->transformColorX);
 	
-	b2Vec2 y_vec = { 0, config.transformLength };
+	b2Vec2 y_vec = { 0, config->transformLength };
 	b2Vec2 transformed_y = b2TransformPoint(transform, y_vec);
-	DrawLineV(to_raylib_vector2(transform.p), to_raylib_vector2(transformed_y), config.transformColorY);
+	DrawLineV(to_raylib_vector2(transform.p), to_raylib_vector2(transformed_y), config->transformColorY);
 }
 
 /// Draw a point.
@@ -129,19 +144,29 @@ static void DrawPointFcn(b2Vec2 p, float size, b2HexColor b2color, void* context
 
 /// Draw a string in world space
 static void DrawStringFcn(b2Vec2 p, const char* s, b2HexColor b2color, void* context) {
-	b2RaylibDebugDrawConfig config = get_draw_config(context);
+	b2RaylibDebugDrawConfig* config = get_draw_config(context);
+	if (!config)
+		return;
+
 	Color color = to_raylib_color(b2color);
-	DrawText(s, p.x, p.y, config.fontSize, color);
+	DrawText(s, p.x, p.y, config->fontSize, color);
 }
 
-b2RaylibDebugDrawConfig b2DefaultRaylibDebugDrawConfig() {
-	b2RaylibDebugDrawConfig debug_draw_config = {
+// void ( *DrawBoundsFcn )( b2AABB aabb, b2HexColor color, void* context );
+static void DrawBoundsFcn( b2AABB aabb, b2HexColor color, void* context ) {
+	DrawRectangleLines(aabb.lowerBound.x, aabb.lowerBound.y,
+			aabb.upperBound.x - aabb.lowerBound.x,
+			aabb.upperBound.y - aabb.lowerBound.y,
+			to_raylib_color(color));
+}
+
+void b2DefaultRaylibDebugDrawConfig(b2RaylibDebugDrawConfig* out) {
+	*out = (b2RaylibDebugDrawConfig){
 		RAYLIB_BOX2D_DEBUG_DRAW_DEFAULT_COLOR_X,
 		RAYLIB_BOX2D_DEBUG_DRAW_DEFAULT_COLOR_Y,
 		RAYLIB_BOX2D_DEBUG_DRAW_DEFAULT_LENGTH,
 		RAYLIB_BOX2D_DEBUG_DRAW_DEFAULT_FONT_SIZE,
 	};
-	return debug_draw_config;
 }
 
 b2DebugDraw b2RaylibDebugDraw() {
@@ -151,9 +176,10 @@ b2DebugDraw b2RaylibDebugDraw() {
 	debug_draw.DrawCircleFcn = DrawCircleFcn;
 	debug_draw.DrawSolidCircleFcn = DrawSolidCircleFcn;
 	debug_draw.DrawSolidCapsuleFcn = DrawSolidCapsuleFcn;
-	debug_draw.DrawSegmentFcn = DrawSegmentFcn;
+	debug_draw.DrawLineFcn = DrawLineFcn;
 	debug_draw.DrawTransformFcn = DrawTransformFcn;
 	debug_draw.DrawPointFcn = DrawPointFcn;
 	debug_draw.DrawStringFcn = DrawStringFcn;
+	debug_draw.DrawBoundsFcn = DrawBoundsFcn;
 	return debug_draw;
 }

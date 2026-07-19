@@ -9,6 +9,8 @@
 
 struct Player;
 
+struct b2RaylibDebugDrawConfig;
+
 struct GameContext
 {
     // only allocate stuff here if it lives until the end of the game
@@ -17,6 +19,7 @@ struct GameContext
     Allocator *frameAllocator = nullptr;
 
     Player *player = nullptr;
+    b2RaylibDebugDrawConfig *debugDrawConfig = nullptr;
 
     b2::World world;
     b2::Body floor;

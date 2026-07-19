@@ -31,6 +31,8 @@ static const char *loggingCategoryToString(LoggingCategory category) NOEXCEPT
         return "Serialization";
     case LoggingCategory::Raylib:
         return "Raylib";
+    case LoggingCategory::Assets:
+        return "Assets";
     }
     return "Unknown Category";
 }

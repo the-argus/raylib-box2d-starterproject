@@ -3,6 +3,7 @@
 
 /*
  * Taken from https://github.com/gilzoide/raylib-box2d-debugdraw
+ * modified slightly to work with a newer box2d version.
  */
 
 #include <box2d/box2d.h>
@@ -24,6 +25,8 @@ extern "C" {
 #ifndef RAYLIB_BOX2D_DEBUG_DRAW_DEFAULT_FONT_SIZE
 	#define RAYLIB_BOX2D_DEBUG_DRAW_DEFAULT_FONT_SIZE 16
 #endif
+	
+#define RAYLIB_BOX2D_DEBUG_DRAW_MAX_POINTS 512
 
 /**
  * Extra configuration for the `b2DebugDraw` returned by `b2RaylibDebugDraw`.
@@ -37,12 +40,16 @@ typedef struct b2RaylibDebugDrawConfig {
 	float transformLength;
 	/// Font size used when drawing text
 	int fontSize;
+
+	/// points buffer used for intermediate polygon points that have to be
+	/// transformed before being drawn
+	b2Vec2 pointsBuffer[RAYLIB_BOX2D_DEBUG_DRAW_MAX_POINTS];
 } b2RaylibDebugDrawConfig;
 
 /**
  * Returns the default configuration for `b2RaylibDebugDraw`.
  */
-b2RaylibDebugDrawConfig b2DefaultRaylibDebugDrawConfig();
+void b2DefaultRaylibDebugDrawConfig(b2RaylibDebugDrawConfig* out);
 
 /**
  * Return a `b2DebugDraw` that draws using Raylib.
