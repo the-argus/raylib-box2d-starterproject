@@ -1,4 +1,5 @@
 #include "player.h"
+#include "convert.h"
 #include "input.h"
 
 #include <raymath.h>
@@ -10,7 +11,7 @@ constexpr f32 friction = 0.2f;
 constexpr f32 airTurnControl = 0.2f;
 constexpr f32 acceleration = 20.f;
 constexpr f32 gravity = 30.f;
-constexpr f32 jumpSpeed = 10.f;
+constexpr f32 jumpSpeed = -10.f;
 
 constexpr b2::PhysicsQueryFilter groundCheckFilter = {
     .categoryBits = u64(CollisionLayer::Player),
@@ -32,21 +33,21 @@ makeGroundCheckShapecastProxy(const b2::Capsule &capsule)
 
     // for a point pogo:
     // proxy = b2MakeProxy( &b2Vec2_zero, 1, 0.0f );
-    // translation = { 0.0f, -rayLength };
+    // translation = { 0.0f, rayLength };
 
     // for a circle pogo:
     const Circle circle = {b2Vec2_zero, 0.5f * capsule.radius};
     proxy = b2MakeProxy(&b2Vec2_zero, 1, circle.radius);
-    translation = {0.0f, -rayLength + circle.radius};
+    translation = {0.0f, rayLength - circle.radius};
 
     // for a segment pogo:
     // const Vec2 segmentOffset = {0.75f * capsule.radius, 0.0f};
     // const Segment segment = {
-    //     .point1 = -segmentOffset,
-    //     .point2 = segmentOffset,
+    //     .point1 = segmentOffset,
+    //     .point2 = -segmentOffset,
     // };
     // proxy = b2MakeProxy( &segment.point1, 2, 0.0f );
-    // translation = { 0.0f, -rayLength };
+    // translation = { 0.0f, rayLength };
 
     return {proxy, translation};
 }
@@ -83,7 +84,8 @@ void Player::solveMove(GameContext *ctx, f32 deltaTime, f32 horizontalInput)
         this->velocity += accelSpeed * desiredDirection;
     }
 
-    this->velocity.y -= gravity * deltaTime;
+    // positive is down
+    this->velocity.y += gravity * deltaTime;
 
     const auto [groundCheckProxy, groundCheckProxyTranslation] =
         makeGroundCheckShapecastProxy(this->shape);
@@ -93,7 +95,7 @@ void Player::solveMove(GameContext *ctx, f32 deltaTime, f32 horizontalInput)
     ctx->world.castShape(
         World::ShapeCastOptions{
             .proxy = &groundCheckProxy,
-            .origin = this->position + this->shape.center1,
+            .origin = this->position + this->shape.center2,
             .translation = groundCheckProxyTranslation,
             .filter = groundCheckFilter,
         },
@@ -104,8 +106,8 @@ void Player::solveMove(GameContext *ctx, f32 deltaTime, f32 horizontalInput)
 
     // isOnGround causes us to snap velocity, so if we are moving up and not on
     // ground then we just left a jump but are still close to the ground / the
-    // shapecast still hit, so ignore it
-    const bool isFalling = this->velocity.y <= 0.01f;
+    // shapecast still hit, so ignore it (positive Y velocity == falling)
+    const bool isFalling = this->velocity.y >= -0.01f;
     this->isOnGround = shapeCastHit && (this->isOnGround || isFalling);
 
     const Vec2 targetPosition = this->position + (deltaTime * this->velocity);
@@ -207,14 +209,24 @@ void Player::draw(GameContext *ctx)
         .height = static_cast<f32>(ctx->textureMissing.height),
     };
 
+    // rectangle is stretched to cover the whole capsule
+    const f32 r = this->shape.radius;
+    const f32 minX = std::min(this->shape.center1.x, this->shape.center2.x) - r;
+    const f32 maxX = std::max(this->shape.center1.x, this->shape.center2.x) + r;
+    const f32 minY = std::min(this->shape.center1.y, this->shape.center2.y) - r;
+    const f32 maxY = std::max(this->shape.center1.y, this->shape.center2.y) + r;
     Rectangle dest{
-        .x = this->position.x - this->shape.radius,
-        .y = this->position.y - this->shape.radius,
-        // this is a square because the texture is but for now the actual
-        // physics body is a capsule
-        .width = this->shape.radius * 2.f,
-        .height = this->shape.radius * 2.f,
+        .x = this->position.x + minX,
+        .y = this->position.y + minY,
+        .width = maxX - minX,
+        .height = maxY - minY,
     };
 
     DrawTexturePro(ctx->textureMissing, source, dest, {}, 0.f, WHITE);
+
+    // debug draw
+    DrawCircleLinesV(conv(this->position + this->shape.center1),
+                     this->shape.radius, GREEN);
+    DrawCircleLinesV(conv(this->position + this->shape.center2),
+                     this->shape.radius, GREEN);
 }

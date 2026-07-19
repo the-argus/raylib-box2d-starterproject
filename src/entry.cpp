@@ -40,15 +40,17 @@ extern "C"
     {
         using namespace b2;
         LOGINFO_MSG(Gameplay, "gamelib init() called");
-        const auto world = World::createWorld({});
+        b2::WorldDef def = World::defaultDefinition();
+        def.gravity = {0.f, 10.f};
+        const auto world = World::createWorld(&def);
 
         auto box1 = Body::defaultDefinition();
         box1.type = b2BodyType::b2_staticBody;
-        box1.position = {.x = 0, .y = -10};
+        box1.position = {.x = 0, .y = 10};
         box1.name = "floor";
         auto box2 = Body::defaultDefinition();
-        box2.type = b2BodyType::b2_kinematicBody;
-        box2.position = {.x = 0, .y = 10};
+        box2.type = b2BodyType::b2_dynamicBody;
+        box2.position = {.x = 0, .y = -10};
         box2.name = "square";
         box2.motionLocks = {.angularZ = true};
 
@@ -69,6 +71,7 @@ extern "C"
         out->player = &player.value();
         out->debugDrawConfig = &debugDrawConfig.value();
         b2DefaultRaylibDebugDrawConfig(out->debugDrawConfig);
+        out->debugDrawConfig->fontSize = 8;
 
         out->square.addPolygonShape({}, b2MakeSquare(1.f));
         out->floor.addSegmentShape({}, {.point1 = {-10, 0}, .point2 = {10, 0}});

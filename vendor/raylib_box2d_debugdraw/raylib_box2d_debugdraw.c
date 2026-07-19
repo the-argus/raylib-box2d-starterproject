@@ -162,10 +162,13 @@ static void DrawStringFcn(b2Vec2 p, const char* s, b2HexColor b2color, void* con
 
 // void ( *DrawBoundsFcn )( b2AABB aabb, b2HexColor color, void* context );
 static void DrawBoundsFcn( b2AABB aabb, b2HexColor color, void* context ) {
-	DrawRectangleLines(aabb.lowerBound.x, aabb.lowerBound.y,
-			aabb.upperBound.x - aabb.lowerBound.x,
-			aabb.upperBound.y - aabb.lowerBound.y,
-			to_raylib_color(color));
+	Rectangle rect = {
+		aabb.lowerBound.x,
+		aabb.lowerBound.y,
+		aabb.upperBound.x - aabb.lowerBound.x,
+		aabb.upperBound.y - aabb.lowerBound.y,
+	};
+	DrawRectangleLinesEx(rect, 0.05f, to_raylib_color(color));
 }
 
 void b2DefaultRaylibDebugDrawConfig(b2RaylibDebugDrawConfig* out) {
