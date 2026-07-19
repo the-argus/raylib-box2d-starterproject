@@ -84,18 +84,18 @@ int main()
 
     state = std::make_unique<AppState>();
 
-    if (not state->gameLib.firstLoad()) {
-        LOGERROR_MSG(Hotreload,
-                     "Failed to load gamelib " HOTRELOAD_LIB_PATH " initially");
-        return EXIT_FAILURE;
-    }
-
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
     InitWindow(420, 720, "Underhanders");
 
     SetTargetFPS(60); // physics timestep is 1/60 so everything is fine here
 
     rlImGuiSetup(true);
+
+    if (not state->gameLib.firstLoad()) {
+        LOGERROR_MSG(Hotreload,
+                     "Failed to load gamelib " HOTRELOAD_LIB_PATH " initially");
+        return EXIT_FAILURE;
+    }
 
 #ifdef __EMSCRIPTEN__
     emscripten_set_main_loop(
