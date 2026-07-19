@@ -19,13 +19,9 @@ void debugDrawBox2dWorld(b2::World world, b2RaylibDebugDrawConfig *config)
 {
     auto debugDrawer = b2RaylibDebugDraw();
 
-    debugDrawer.drawBodyNames = true;
     debugDrawer.drawShapes = true;
-    debugDrawer.drawBounds = true;
-    debugDrawer.drawContacts = true;
-    debugDrawer.drawContactNormals = true;
     debugDrawer.drawContactForces = true;
-    debugDrawer.drawMass = true;
+    debugDrawer.forceScale = 0.1;
 
     debugDrawer.context = config;
 
@@ -71,7 +67,6 @@ extern "C"
         out->player = &player.value();
         out->debugDrawConfig = &debugDrawConfig.value();
         b2DefaultRaylibDebugDrawConfig(out->debugDrawConfig);
-        out->debugDrawConfig->fontSize = 8;
 
         out->square.addPolygonShape({}, b2MakeSquare(1.f));
         out->floor.addSegmentShape({}, {.point1 = {-10, 0}, .point2 = {10, 0}});
@@ -175,8 +170,6 @@ extern "C"
             debugDrawBox2dWorld(ctx->world, ctx->debugDrawConfig);
 
             ctx->player->draw(ctx);
-
-            DrawRectangle(50, 50, 100, 100, BLUE);
         }
 
         rlImGuiBegin();
