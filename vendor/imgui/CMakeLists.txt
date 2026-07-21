@@ -151,6 +151,7 @@ if(IMGUI_BUILD_RAYLIB_BINDING)
   target_include_directories(${PROJECT_NAME} PRIVATE ${RLIMGUI_SOURCE_DIR})
 
   target_link_libraries(${PROJECT_NAME} PUBLIC raylib)
+  target_compile_definitions(${PROJECT_NAME} PUBLIC NO_FONT_AWESOME)
 endif()
 
 if(IMGUI_BUILD_SDL3_BINDING)

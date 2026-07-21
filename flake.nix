@@ -65,10 +65,16 @@
               gdb
               valgrind
 
+			  bloaty
+
               glfw
               libGLU
               libx11
               libxrandr
+			  # needed for building raylib's glfw
+              libxinerama
+			  libxcursor
+			  libxi
             ]);
 
           hardeningDisable = ["all"];

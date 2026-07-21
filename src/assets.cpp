@@ -1,5 +1,5 @@
 #include "assets.h"
-#include "logging.h"
+#include "macros.h"
 
 #include <cmrc/cmrc.hpp>
 
@@ -16,9 +16,9 @@ Image loadImage(const char *filename)
     if (fs.is_file(filenameString)) {
         imageFile = fs.open(filenameString);
     } else [[unlikely]] {
-        LOGWARN(Assets,
-                "Failed to load asset {}, falling back to missing texture",
-                filenameString);
+        // LOGWARN(Assets,
+        //         "Failed to load asset {}, falling back to missing texture",
+        //         filenameString.c_str());
         uassert(fs.is_file("missing.png"), "build is messed up");
         imageFile = fs.open("missing.png");
     }

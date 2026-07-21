@@ -6,7 +6,6 @@
 #include <fmt/core.h>
 
 #include <cstdarg>
-#include <utility>
 
 // NOTE: these levels match up with the raylib log levels, there are
 // static_asserts for this in logging.cpp
@@ -35,17 +34,16 @@ namespace detail {
 void printLevelPrefix(LogLevel level) NOEXCEPT;
 void printCategoryPrefix(LoggingCategory category) NOEXCEPT;
 void printCurrentTimePrefix() NOEXCEPT;
+void logImplImpl(LogLevel level, LoggingCategory category,
+                 fmt::string_view formatString, fmt::format_args args);
 
 template <typename... Args>
 inline void logImpl(LogLevel level, LoggingCategory category,
                     fmt::format_string<Args...> formatString,
                     Args &&...args) NOEXCEPT
 {
-    printCurrentTimePrefix();
-    printLevelPrefix(level);
-    printCategoryPrefix(category);
-    fmt::println(std::forward<fmt::format_string<Args...>>(formatString),
-                 std::forward<Args>(args)...);
+    logImplImpl(level, category, formatString.get(),
+                fmt::make_format_args(args...));
 }
 
 // TODO: probably have log levels

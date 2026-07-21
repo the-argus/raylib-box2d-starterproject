@@ -95,4 +95,13 @@ void logCallback(int logLevel, const char *text, va_list args)
     buf.back() = '\0'; // jusssst in case
     fmt::print("{}\n", buf.data());
 }
+
+void logImplImpl(LogLevel level, LoggingCategory category,
+                 fmt::string_view formatString, fmt::format_args args)
+{
+    printCurrentTimePrefix();
+    printLevelPrefix(level);
+    printCategoryPrefix(category);
+    fmt::println("{}", fmt::vformat(formatString, args));
+}
 } // namespace detail

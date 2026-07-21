@@ -39,13 +39,13 @@ if(NOT GAME_NO_HOTRELOAD AND EMSCRIPTEN)
   )
 endif()
 
-if(NOT CMAKE_SYSTEM_NAME MATCHES "Emscripten")
-  find_program(MOLD_PROGRAM mold)
-  if(MOLD_PROGRAM)
-    set(CMAKE_LINKER_TYPE MOLD)
-    message(STATUS "mold found: ${MOLD_PROGRAM}")
-  endif()
-endif()
+# if(NOT CMAKE_SYSTEM_NAME MATCHES "Emscripten")
+#   find_program(MOLD_PROGRAM mold)
+#   if(MOLD_PROGRAM)
+#     set(CMAKE_LINKER_TYPE MOLD)
+#     message(STATUS "mold found: ${MOLD_PROGRAM}")
+#   endif()
+# endif()
 
 set(common_source_files src/logging.cpp)
 set(hotreloaded_source_files
@@ -102,6 +102,11 @@ endif()
 
 if(CMAKE_BUILD_TYPE MATCHES "Release")
   target_compile_definitions(${PROJECT_NAME} PRIVATE ASSERTS_DISABLED)
+endif()
+if(CMAKE_BUILD_TYPE MATCHES "MinSizeRel")
+  target_compile_definitions(${PROJECT_NAME} PRIVATE FMT_OPTIMIZE_SIZE=2
+                                                     FMT_BUILTIN_TYPES=0)
+  # target_compile_options(${PROJECT_NAME} PRIVATE -g)
 endif()
 
 if(EMSCRIPTEN)
