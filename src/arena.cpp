@@ -82,7 +82,11 @@ void Arena::freeAllocationsAfter(DebugAllocationListNode *stop) NOEXCEPT
     while (m_debugAllocations != stop) {
         uassert(m_debugAllocations != nullptr);
         DebugAllocationListNode *next = m_debugAllocations->next;
+#ifdef _MSC_VER
+        _aligned_free(m_debugAllocations->memory);
+#else
         ::free(m_debugAllocations->memory);
+#endif
         ::free(m_debugAllocations);
         m_debugAllocations = next;
     }
@@ -101,10 +105,15 @@ Arena::impl_allocate(const alloc::Request &request) NOEXCEPT
     const size_t align = request.alignment < alignof(std::max_align_t)
                              ? alignof(std::max_align_t)
                              : request.alignment;
-    // aligned_alloc requires size be a multiple of alignment.
+    // aligned_alloc requires size be a multiple of alignment
     const size_t size = (request.numBytes + align - 1) / align * align;
 
-    void *mem = ::aligned_alloc(align, size);
+    void *mem =
+#ifdef _MSC_VER
+        _aligned_malloc(size, align);
+#else
+        ::aligned_alloc(align, size);
+#endif
     if (not mem) [[unlikely]] {
         ::free(node);
         return alloc::Error::OOM;

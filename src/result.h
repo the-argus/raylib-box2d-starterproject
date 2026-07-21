@@ -47,23 +47,42 @@ struct Result<T, Error>
         return std::move(m_value);
     }
 
-    [[nodiscard]] T &operator->() &
+    [[nodiscard]] T &operator*() &
     {
         uassert(isSuccess(),
                 "Attempt to get value of a result that is not a success");
         return m_value;
     }
-    [[nodiscard]] const T &operator->() const &
+    [[nodiscard]] const T &operator*() const &
     {
         uassert(isSuccess(),
                 "Attempt to get value of a result that is not a success");
         return m_value;
     }
-    [[nodiscard]] T &&operator->() &&
+    [[nodiscard]] T &&operator*() &&
     {
         uassert(isSuccess(),
                 "Attempt to get value of a result that is not a success");
         return std::move(m_value);
+    }
+
+    [[nodiscard]] T* operator->() &
+    {
+        uassert(isSuccess(),
+                "Attempt to get value of a result that is not a success");
+        return std::addressof(m_value);
+    }
+    [[nodiscard]] const T* operator->() const &
+    {
+        uassert(isSuccess(),
+                "Attempt to get value of a result that is not a success");
+        return std::addressof(m_value);
+    }
+    [[nodiscard]] T* operator->() &&
+    {
+        uassert(isSuccess(),
+                "Attempt to get value of a result that is not a success");
+        return std::addressof(m_value);
     }
 
     [[nodiscard]] Error error() const { return m_error; }
@@ -179,7 +198,14 @@ struct Result<T, Error>
         return isError() ? defaultValue : value();
     }
 
-    [[nodiscard]] T operator->() const &
+    [[nodiscard]] auto* operator->() const &
+    {
+        uassert(isSuccess(),
+                "Attempt to get value of a result that is not a success");
+        return m_value;
+    }
+
+    [[nodiscard]] T operator*() const &
     {
         uassert(isSuccess(),
                 "Attempt to get value of a result that is not a success");

@@ -4,6 +4,8 @@
 
 #include <raymath.h>
 
+#include <array>
+
 constexpr f32 minSpeed = 0.1f; // meters per second
 constexpr f32 maxSpeed = 6.0f;
 constexpr f32 stopSpeed = 3.0f;

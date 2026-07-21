@@ -8,7 +8,7 @@
 
 #define uabort(msg)                                                         \
     do {                                                                    \
-        ::fprintf(stderr,                                                   \
+        (void)::fprintf(stderr,                                                   \
                   "Aborted program: (%s). Occurred at file %s, line %d.\n", \
                   __FILE__, __LINE__);                                      \
         ::abort();                                                          \
@@ -23,7 +23,7 @@
 #define _UASSERT_CONDITION_ONLY(condition)                                   \
     do {                                                                     \
         if (!(condition)) {                                                  \
-            ::fprintf(stderr, "Assertion failed: (%s), file %s, line %d.\n", \
+            (void)::fprintf(stderr, "Assertion failed: (%s), file %s, line %d.\n", \
                       #condition, __FILE__, __LINE__);                       \
             ::abort();                                                       \
         }                                                                    \
@@ -32,7 +32,7 @@
 #define _UASSERT_CONDITION_AND_MESSAGE(condition, message)                \
     do {                                                                  \
         if (!(condition)) {                                               \
-            ::fprintf(                                                    \
+            (void)::fprintf(                                                    \
                 stderr,                                                   \
                 "Assertion failed: (%s), file %s, line %d, reason: %s\n", \
                 #condition, __FILE__, __LINE__, message);                 \

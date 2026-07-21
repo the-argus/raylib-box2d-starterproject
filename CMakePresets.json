@@ -19,11 +19,13 @@
     },
     {
       "name": "vs-dev",
+      "generator": "Visual Studio 17 2022",
       "displayName": "Visual Studio developer build",
       "inherits": ["dev-base"]
     },
     {
       "name": "vs-dev-noreload",
+      "generator": "Visual Studio 17 2022",
       "displayName": "Visual Studio developer build without hot reload",
       "inherits": ["dev-base"],
       "cacheVariables": {

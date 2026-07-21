@@ -237,8 +237,7 @@ class CAllocator : public Allocator
         return Bytes(static_cast<u8 *>(allocated), request.numBytes);
     }
 
-    constexpr void impl_deallocate(void *memory,
-                                   size_t size_hint) NOEXCEPT final
+    void impl_deallocate(void *memory, size_t size_hint) NOEXCEPT final
     {
         ::free(memory);
     }
