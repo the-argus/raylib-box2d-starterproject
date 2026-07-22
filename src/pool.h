@@ -29,6 +29,8 @@ template <typename T> class Pool
     {
         u32 index;
         u32 generation;
+
+        constexpr bool operator==(const MapEntry &) const = default;
     };
 
   public:
@@ -54,6 +56,8 @@ template <typename T> class Pool
             uassert(instance);
             return instance->isValid(*this);
         }
+
+        constexpr bool operator==(const Handle &) const = default;
 
       private:
         T &get() const
@@ -113,19 +117,20 @@ template <typename T> class Pool
             uassert(m_allocator);
 
             Result allocation = m_allocator->allocate(alloc::Request{
-                .alignment = alignof(T),
                 .numBytes = sizeof(T) * PoolStats<T>::initialPoolItems,
+                .alignment = alignof(T),
             });
             Result mappingAllocation = m_allocator->allocate(alloc::Request{
-                .alignment = alignof(MapEntry),
                 .numBytes = sizeof(MapEntry) * PoolStats<T>::initialPoolItems,
+                .alignment = alignof(MapEntry),
             });
 
             if (!mappingAllocation || !allocation)
                 return {};
 
-            m_buffer = allocation->data();
-            m_mappingBuffer = mappingAllocation->data();
+            m_buffer = std::launder(reinterpret_cast<T *>(allocation->data()));
+            m_mappingBuffer = std::launder(
+                reinterpret_cast<MapEntry *>(mappingAllocation->data()));
             m_capacity =
                 std::min(allocation->size_bytes() / sizeof(T),
                          mappingAllocation->size_bytes() / sizeof(MapEntry));
@@ -178,8 +183,10 @@ template <typename T> class Pool
                 return {};
 
             const u32 newMemoryStartIndex = m_capacity;
-            m_buffer = reallocation->data();
-            m_mappingBuffer = mappingBufferReallocation->data();
+            m_buffer =
+                std::launder(reinterpret_cast<T *>(reallocation->data()));
+            m_mappingBuffer = std::launder(reinterpret_cast<MapEntry *>(
+                mappingBufferReallocation->data()));
             m_capacity = std::min(reallocation->size_bytes() / sizeof(T),
                                   mappingBufferReallocation->size_bytes() /
                                       sizeof(MapEntry));
@@ -288,6 +295,36 @@ template <typename T> class Pool
     }
 
     [[nodiscard]] bool isNull(Handle item) const { return not isValid(item); }
+
+    void clear()
+    {
+        if (m_buffer == nullptr) {
+            uassert(m_size == 0);
+            return;
+        }
+
+        for (u32 i = 0; i < m_capacity; ++i) {
+            MapEntry &entry = m_mappingBuffer[i];
+            if (entry.generation % 2 == 1) {
+                uassert(entry.index < m_size);
+                m_buffer[entry.index].~T();
+
+                entry.generation++;
+                if (entry.generation == invalidU32) [[unlikely]] {
+                    entry.generation = 0;
+                }
+                uassert(entry.generation % 2 == 0);
+            }
+            m_mappingBuffer[i].index = i + 1;
+        }
+
+        m_firstFreeMapEntry = 0;
+        m_size = 0;
+
+#ifndef NDEBUG
+        ::memset(m_buffer, 0xCD, m_capacity * sizeof(T));
+#endif
+    }
 
     Pool() = delete;
 

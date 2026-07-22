@@ -54,6 +54,9 @@ set(hotreloaded_source_files
 set(main_source_files src/main.cpp)
 set(include_directories src/ vendor/raylib_box2d_debugdraw)
 
+add_executable(pool_test src/pool_test.cpp)
+target_include_directories(pool_test PRIVATE src/)
+
 # the game may run `cmake --build HOTRELOAD_BUILD_DIR --target
 # HOTRELOAD_LIB_TARGET` in debug mode, and re-link to it
 if(NOT GAME_NO_HOTRELOAD)
@@ -119,6 +122,16 @@ set_target_properties(
              CXX_SCAN_FOR_MODULES OFF
              CXX_MODULE_STD OFF
              CXX_EXTENSIONS OFF)
+
+set_target_properties(
+  pool_test
+  PROPERTIES CXX_STANDARD_REQUIRED ON
+             CXX_STANDARD 20
+             CXX_SCAN_FOR_MODULES OFF
+             CXX_MODULE_STD OFF
+             CXX_EXTENSIONS OFF)
+target_include_directories(pool_test PRIVATE src/)
+target_compile_options(pool_test PRIVATE -O0 -ggdb)
 
 if(NOT GAME_NO_HOTRELOAD)
   set_target_properties(
