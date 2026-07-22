@@ -13,8 +13,9 @@
 enum class CollisionLayer : u64
 {
     // clang-format off
-    World  = 0b0000001,
-    Player = 0b0000010,
+    World   = 0b0000001,
+    Player  = 0b0000010,
+    Bullets = 0b0000100,
     // clang-format on
 };
 
@@ -127,6 +128,11 @@ template <bool isConst> struct PhysicsRaycastResult
     f32 fraction = 1.0;
     bool hit = false;
 };
+
+[[nodiscard]] inline bool isValid(b2WorldId world)
+{
+    return b2World_IsValid(world);
+}
 
 [[nodiscard]] inline bool isValid(b2JointId joint)
 {
@@ -267,7 +273,7 @@ template <bool isConst> class WorldImpl;
 template <bool isConst> class ShapeImpl
 {
   private:
-    b2ShapeId id;
+    b2ShapeId id{};
 
     ShapeImpl(b2ShapeId _id) NOEXCEPT : id(_id) {}
 
@@ -281,7 +287,7 @@ template <bool isConst> class ShapeImpl
         return b2DefaultShapeDef();
     }
 
-    ShapeImpl() = delete;
+    ShapeImpl() = default;
 
     constexpr operator b2ShapeId() const NOEXCEPT { return id; }
 
@@ -556,7 +562,7 @@ using ShapeConst = ShapeImpl<true>;
 template <bool isConst> class BodyImpl
 {
   private:
-    b2BodyId id;
+    b2BodyId id{};
 
   private:
     constexpr explicit BodyImpl(b2BodyId id) NOEXCEPT : id(id) {}
@@ -571,7 +577,7 @@ template <bool isConst> class BodyImpl
     template <bool worldConst> friend class WorldImpl;
     template <bool shapeConst> friend class ShapeImpl;
 
-    BodyImpl() = delete;
+    BodyImpl() = default;
 
     constexpr operator b2BodyId() const NOEXCEPT { return id; }
 
@@ -1064,7 +1070,7 @@ using BodyConst = BodyImpl<true>;
 template <bool isConst> class WorldImpl
 {
   private:
-    b2WorldId id;
+    b2WorldId id{};
 
     WorldImpl(b2WorldId _id) NOEXCEPT : id(_id) {}
 
@@ -1078,7 +1084,10 @@ template <bool isConst> class WorldImpl
     template <bool bodyConst> friend class BodyImpl;
     template <bool shapeConst> friend class ShapeImpl;
 
-    WorldImpl() = delete;
+    WorldImpl() = default;
+
+    [[nodiscard]] bool isValid() const NOEXCEPT { return isValid(id); }
+    explicit operator bool() const NOEXCEPT { return isValid(); }
 
     constexpr operator b2WorldId() const NOEXCEPT { return id; }
 
@@ -1097,7 +1106,7 @@ template <bool isConst> class WorldImpl
         return WorldImpl(b2CreateWorld(def));
     }
 
-    Body createBody(const BodyDef *def) const NOEXCEPT
+    Body createBody(const BodyDef *def = nullptr) const NOEXCEPT
         requires(not isConst)
     {
         if (!def) {

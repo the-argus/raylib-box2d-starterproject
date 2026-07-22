@@ -50,7 +50,7 @@ endif()
 set(common_source_files src/logging.cpp)
 set(hotreloaded_source_files
     src/entry.cpp src/arena.cpp src/assets.cpp src/player.cpp
-    vendor/raylib_box2d_debugdraw/raylib_box2d_debugdraw.c)
+    vendor/raylib_box2d_debugdraw/raylib_box2d_debugdraw.c src/bullet.cpp)
 set(main_source_files src/main.cpp)
 set(include_directories src/ vendor/raylib_box2d_debugdraw)
 

@@ -17,6 +17,11 @@
     return not ImGui::GetIO().WantCaptureMouse and IsMouseButtonDown(button);
 }
 
+[[nodiscard]] inline bool isMouseButtonJustPressedInApp(int button)
+{
+    return not ImGui::GetIO().WantCaptureMouse and IsMouseButtonPressed(button);
+}
+
 [[nodiscard]] inline f32 mouseScrollDeltaInApp()
 {
     if (ImGui::GetIO().WantCaptureMouse)
@@ -26,22 +31,22 @@
 
 [[nodiscard]] inline bool isKeyJustPressedInApp(int button)
 {
-    return not ImGui::GetIO().WantCaptureMouse and IsKeyPressed(button);
+    return not ImGui::GetIO().WantCaptureKeyboard and IsKeyPressed(button);
 }
 
 [[nodiscard]] inline bool isKeyDownInApp(int button)
 {
-    return not ImGui::GetIO().WantCaptureMouse and IsKeyDown(button);
+    return not ImGui::GetIO().WantCaptureKeyboard and IsKeyDown(button);
 }
 
 [[nodiscard]] inline bool isKeyUpInApp(int button)
 {
-    return ImGui::GetIO().WantCaptureMouse || IsKeyUp(button);
+    return ImGui::GetIO().WantCaptureKeyboard || IsKeyUp(button);
 }
 
 [[nodiscard]] inline bool isKeyJustReleasedInApp(int button)
 {
-    return not ImGui::GetIO().WantCaptureMouse and IsKeyReleased(button);
+    return not ImGui::GetIO().WantCaptureKeyboard and IsKeyReleased(button);
 }
 
 [[nodiscard]] inline Vector2 getMouseDeltaInApp()

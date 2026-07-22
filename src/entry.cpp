@@ -1,6 +1,7 @@
 #include "arena.h"
 #include "assets.h"
 #include "box2d.h"
+#include "bullet.h"
 #include "convert.h"
 #include "defer.h"
 #include "game_context.h"
@@ -170,6 +171,10 @@ extern "C"
             debugDrawBox2dWorld(ctx->world, ctx->debugDrawConfig);
 
             ctx->player->draw(ctx);
+
+            for (Bullet &bullet : Pool<Bullet>::instance()->items()) {
+                bullet.draw();
+            }
         }
 
         rlImGuiBegin();
