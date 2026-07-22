@@ -83,27 +83,22 @@ template <typename T> class Pool
         return std::span<const T>{m_buffer, m_size};
     }
 
-    /// Performs a linear search until it finds a handle pointing to the given
-    /// element
     [[nodiscard]] Handle handleForItem(const T &item)
     {
         const T *addr = std::addressof(item);
         if (addr >= m_buffer and addr < m_buffer + m_size) {
-            const u32 index = static_cast<u32>(addr - m_buffer);
-            for (u32 i = 0; i < m_capacity; ++i) {
-                const MapEntry &entry = m_mappingBuffer[i];
-                if (entry.generation % 2 == 0)
-                    continue; // dead element
-
-                if (entry.index == index) {
-                    return Handle{MapEntry{
-                        .index = i,
-                        .generation = entry.generation,
-                    }};
-                }
-            }
-            uassert(false, "some invariant of Pool broke and an element in the "
-                           "valid region does not have a corresponding handle");
+            const u32 dataIndex = static_cast<u32>(addr - m_buffer);
+            const u32 entryIndex = m_reverseLookupBuffer[dataIndex];
+            uassert(entryIndex < m_capacity);
+            const MapEntry &entry = m_mappingBuffer[entryIndex];
+            uassert(entry.generation % 2 == 1,
+                    "expected live element, reverse lookup must be broken");
+            uassert(entry.index == dataIndex,
+                    "reverse lookup and mappingBuffer have fallen out of sync");
+            return Handle{MapEntry{
+                .index = entryIndex,
+                .generation = entry.generation,
+            }};
         }
         return {};
     }
@@ -113,7 +108,8 @@ template <typename T> class Pool
     Handle make(ConstructorArgs &&...args)
     {
         if (m_buffer == nullptr) [[unlikely]] {
-            uassert(m_mappingBuffer == nullptr and m_capacity == 0);
+            uassert(m_mappingBuffer == nullptr and
+                    m_reverseLookupBuffer == nullptr and m_capacity == 0);
             uassert(m_allocator);
 
             Result allocation = m_allocator->allocate(alloc::Request{
@@ -124,22 +120,31 @@ template <typename T> class Pool
                 .numBytes = sizeof(MapEntry) * PoolStats<T>::initialPoolItems,
                 .alignment = alignof(MapEntry),
             });
+            Result reverseAllocation = m_allocator->allocate(alloc::Request{
+                .numBytes = sizeof(u32) * PoolStats<T>::initialPoolItems,
+                .alignment = alignof(u32),
+            });
 
-            if (!mappingAllocation || !allocation)
+            if (!mappingAllocation || !allocation || !reverseAllocation)
                 return {};
 
             m_buffer = std::launder(reinterpret_cast<T *>(allocation->data()));
             m_mappingBuffer = std::launder(
                 reinterpret_cast<MapEntry *>(mappingAllocation->data()));
-            m_capacity =
+            m_reverseLookupBuffer = std::launder(
+                reinterpret_cast<u32 *>(reverseAllocation->data()));
+            m_capacity = std::min(
                 std::min(allocation->size_bytes() / sizeof(T),
-                         mappingAllocation->size_bytes() / sizeof(MapEntry));
+                         mappingAllocation->size_bytes() / sizeof(MapEntry)),
+                reverseAllocation->size_bytes() / sizeof(u32));
             m_size = 0;
 
 #ifndef NDEBUG
             ::memset(allocation->data(), 0xCD, allocation->size_bytes());
             ::memset(mappingAllocation->data(), 0xCD,
                      mappingAllocation->size_bytes());
+            ::memset(reverseAllocation->data(), 0xCD,
+                     reverseAllocation->size_bytes());
 #endif
 
             // initially, MapEntry indexes refer to where the next free spot is
@@ -153,6 +158,7 @@ template <typename T> class Pool
         } else if (m_size == m_capacity) {
             const auto currentSizeBytes = m_capacity * sizeof(T);
             const auto currentMappingSizeBytes = m_capacity * sizeof(MapEntry);
+            const auto currentReverseSizeBytes = m_capacity * sizeof(u32);
 
             const alloc::ReallocateRequest reallocationParams{
                 .memory =
@@ -174,12 +180,25 @@ template <typename T> class Pool
                     sizeof(MapEntry),
                 .alignment = alignof(MapEntry),
             };
+            const alloc::ReallocateRequest reverseBufferReallocationParams{
+                .memory = Bytes(reinterpret_cast<u8 *>(m_reverseLookupBuffer),
+                                currentReverseSizeBytes),
+                .newSizeBytes = currentReverseSizeBytes + sizeof(u32),
+                .preferredSizeBytes =
+                    static_cast<u64>(static_cast<f32>(m_capacity) *
+                                     PoolStats<T>::growFactor) *
+                    sizeof(u32),
+                .alignment = alignof(u32),
+            };
 
             Result reallocation = m_allocator->reallocate(reallocationParams);
             Result mappingBufferReallocation =
                 m_allocator->reallocate(mappingBufferReallocationParams);
+            Result reverseBufferReallocation =
+                m_allocator->reallocate(reverseBufferReallocationParams);
 
-            if (not reallocation or not mappingBufferReallocation)
+            if (not reallocation or not mappingBufferReallocation or
+                not reverseBufferReallocation)
                 return {};
 
             const u32 newMemoryStartIndex = m_capacity;
@@ -187,15 +206,21 @@ template <typename T> class Pool
                 std::launder(reinterpret_cast<T *>(reallocation->data()));
             m_mappingBuffer = std::launder(reinterpret_cast<MapEntry *>(
                 mappingBufferReallocation->data()));
-            m_capacity = std::min(reallocation->size_bytes() / sizeof(T),
+            m_reverseLookupBuffer = std::launder(
+                reinterpret_cast<u32 *>(reverseBufferReallocation->data()));
+            m_capacity =
+                std::min(std::min(reallocation->size_bytes() / sizeof(T),
                                   mappingBufferReallocation->size_bytes() /
-                                      sizeof(MapEntry));
+                                      sizeof(MapEntry)),
+                         reverseBufferReallocation->size_bytes() / sizeof(u32));
             uassert(m_capacity > newMemoryStartIndex);
 #ifndef NDEBUG
             ::memset(m_buffer + m_size, 0xCD,
                      (m_capacity - m_size) * sizeof(T));
             ::memset(m_mappingBuffer + m_size, 0xCD,
                      (m_capacity - m_size) * sizeof(MapEntry));
+            ::memset(m_reverseLookupBuffer + m_size, 0xCD,
+                     (m_capacity - m_size) * sizeof(u32));
 #endif
             for (u32 i = newMemoryStartIndex; i < m_capacity; ++i) {
                 m_mappingBuffer[i] = MapEntry{.index = i + 1, .generation = 0};
@@ -215,6 +240,7 @@ template <typename T> class Pool
             entry.generation = 1;
         }
         entry.index = m_size;
+        m_reverseLookupBuffer[entry.index] = entryIndex;
         m_size++;
         T *actual = std::addressof(m_buffer[entry.index]);
         std::construct_at(actual, std::forward<ConstructorArgs>(args)...);
@@ -251,11 +277,13 @@ template <typename T> class Pool
 
         uassert(m_size > 0);
         if (entry.index != m_size - 1) {
-            T &last = items()[m_size - 1];
-            Handle handle = handleForItem(last);
+            const u32 lastDataIndex = m_size - 1;
+            T &last = m_buffer[lastDataIndex];
+            const u32 movedEntryIndex = m_reverseLookupBuffer[lastDataIndex];
             std::construct_at(std::addressof(actual), std::move(last));
             last.~T();
-            m_mappingBuffer[handle.m_entry.index].index = entry.index;
+            m_mappingBuffer[movedEntryIndex].index = entry.index;
+            m_reverseLookupBuffer[entry.index] = movedEntryIndex;
         }
 
         entry.index = m_firstFreeMapEntry;
@@ -323,6 +351,7 @@ template <typename T> class Pool
 
 #ifndef NDEBUG
         ::memset(m_buffer, 0xCD, m_capacity * sizeof(T));
+        ::memset(m_reverseLookupBuffer, 0xCD, m_capacity * sizeof(u32));
 #endif
     }
 
@@ -334,6 +363,7 @@ template <typename T> class Pool
     Allocator *m_allocator = cAllocator();
     T *m_buffer{};
     MapEntry *m_mappingBuffer{};
+    u32 *m_reverseLookupBuffer{};
     u32 m_size{};
     u32 m_capacity{};
     u32 m_firstFreeMapEntry{};
