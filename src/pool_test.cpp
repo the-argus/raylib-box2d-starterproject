@@ -235,11 +235,17 @@ void testRandomCreateAndDestroy()
 int main()
 {
     testValidItem();
+    fmt::println("testValidItem done");
     testDestroy();
+    fmt::println("testDestroy done");
     testBadArgsForHandleForItem();
+    fmt::println("testBadArgsForHandleForItem done");
     testHandlesWhenDestroyingElements();
+    fmt::println("testHandlesWhenDestroyingElements done");
     testAllocateManySize();
+    fmt::println("testAllocateManySize done");
     testRandomCreateAndDestroy();
+    fmt::println("testRandomCreateAndDestroy done");
 
     return 0;
 }
