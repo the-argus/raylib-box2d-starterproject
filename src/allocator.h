@@ -181,18 +181,14 @@ class Allocator
         void (*destructorFunction)(DestructorBase &self);
     };
 
-    constexpr virtual void
-    impl_arenaPushDestructor(DestructorBase &entry) NOEXCEPT {};
+    virtual void impl_arenaPushDestructor(DestructorBase &entry) NOEXCEPT;
 
     [[nodiscard]] constexpr virtual Result<Bytes, alloc::Error>
     impl_allocate(const alloc::Request &) NOEXCEPT = 0;
 
-    [[nodiscard]] constexpr virtual void *impl_arenaNewScope() NOEXCEPT
-    {
-        return nullptr;
-    };
+    [[nodiscard]] virtual void *impl_arenaNewScope() NOEXCEPT;
 
-    constexpr virtual void impl_arenaRestoreScope(void *handle) NOEXCEPT {}
+    virtual void impl_arenaRestoreScope(void *handle) NOEXCEPT;
 
     constexpr virtual void impl_deallocate(void *memory,
                                            size_t size_hint) NOEXCEPT = 0;

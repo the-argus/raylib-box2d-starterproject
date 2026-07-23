@@ -47,22 +47,25 @@ if(NOT CMAKE_SYSTEM_NAME MATCHES "Emscripten")
   endif()
 endif()
 
-set(common_source_files src/logging.cpp)
+# common source files cannot be hot reloaded but are shared by main.cpp and the
+# reloaded game. useful for persistent symbols such as virtual functions or
+# anything we need function pointers to
+set(common_source_files src/logging.cpp src/arena.cpp src/allocator.cpp)
 set(hotreloaded_source_files
-    src/entry.cpp src/arena.cpp src/assets.cpp src/player.cpp
+    src/entry.cpp src/assets.cpp src/player.cpp
     vendor/raylib_box2d_debugdraw/raylib_box2d_debugdraw.c src/bullet.cpp)
 set(main_source_files src/main.cpp)
 set(include_directories src/ vendor/raylib_box2d_debugdraw)
 
-add_executable(pool_test src/pool_test.cpp)
+add_executable(pool_test src/pool_test.cpp src/allocator.cpp src/arena.cpp)
 target_include_directories(pool_test PRIVATE src/)
 
 # the game may run `cmake --build HOTRELOAD_BUILD_DIR --target
 # HOTRELOAD_LIB_TARGET` in debug mode, and re-link to it
 if(NOT GAME_NO_HOTRELOAD)
-  add_library(${PROJECT_NAME}_lib SHARED ${hotreloaded_source_files}
-                                         ${common_source_files})
-  add_executable(${PROJECT_NAME} ${main_source_files} ${common_source_files})
+  add_library(${PROJECT_NAME}_lib SHARED ${hotreloaded_source_files})
+  add_library(common SHARED ${common_source_files})
+  add_executable(${PROJECT_NAME} ${main_source_files})
   add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_lib)
   target_compile_definitions(
     ${PROJECT_NAME}
@@ -71,7 +74,6 @@ if(NOT GAME_NO_HOTRELOAD)
             HOTRELOAD_LIB_TARGET="${PROJECT_NAME}_lib"
             HOTRELOAD_LIB_PATH=\"$<TARGET_FILE:${PROJECT_NAME}_lib>\")
 else()
-  # in release mode, _lib and the executable are the same
   add_executable(
     ${PROJECT_NAME} ${main_source_files} ${hotreloaded_source_files}
                     ${common_source_files})
@@ -87,6 +89,8 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug" AND NOT MSVC)
   if(NOT GAME_NO_HOTRELOAD)
     target_compile_options(${PROJECT_NAME}_lib PRIVATE ${DEBUG_COMPILE_OPTIONS})
     target_link_options(${PROJECT_NAME}_lib PRIVATE ${DEBUG_LINK_OPTIONS})
+    target_compile_options(common PRIVATE ${DEBUG_COMPILE_OPTIONS})
+    target_link_options(common PRIVATE ${DEBUG_LINK_OPTIONS})
   endif()
 endif()
 
@@ -100,11 +104,16 @@ if(MSVC
     target_link_options(${PROJECT_NAME}_lib PRIVATE
                         $<$<CONFIG:Debug>:/INCREMENTAL>)
     target_compile_options(${PROJECT_NAME}_lib PRIVATE $<$<CONFIG:Debug>:/ZI>)
+    target_link_options(common PRIVATE $<$<CONFIG:Debug>:/INCREMENTAL>)
+    target_compile_options(common PRIVATE $<$<CONFIG:Debug>:/ZI>)
   endif()
 endif()
 
 if(CMAKE_BUILD_TYPE MATCHES "Release")
   target_compile_definitions(${PROJECT_NAME} PRIVATE ASSERTS_DISABLED)
+  if(NOT GAME_NO_HOTRELOAD)
+    message(FATAL_ERROR "hotreload not supported in release build")
+  endif()
 endif()
 
 if(EMSCRIPTEN)
@@ -142,6 +151,14 @@ if(NOT GAME_NO_HOTRELOAD)
                CXX_MODULE_STD OFF
                CXX_EXTENSIONS OFF)
   target_include_directories(${PROJECT_NAME}_lib PRIVATE ${include_directories})
+  set_target_properties(
+    common
+    PROPERTIES CXX_STANDARD_REQUIRED ON
+               CXX_STANDARD 20
+               CXX_SCAN_FOR_MODULES OFF
+               CXX_MODULE_STD OFF
+               CXX_EXTENSIONS OFF)
+  target_include_directories(common PRIVATE ${include_directories})
 endif()
 target_include_directories(${PROJECT_NAME} PRIVATE ${include_directories})
 
@@ -152,17 +169,17 @@ find_package(fmt REQUIRED NO_CMAKE_SYSTEM_PATH)
 
 add_subdirectory(assets)
 
-# main needs raylib and imgui because those have some static/global
-# initialization that needs to stick around
-target_link_libraries(${PROJECT_NAME} raylib imgui::imgui fmt::fmt box2d::box2d)
+set(LIBS_TO_LINK raylib imgui::imgui fmt::fmt box2d::box2d)
+target_link_libraries(${PROJECT_NAME} ${LIBS_TO_LINK} game::resources)
+target_compile_definitions(${PROJECT_NAME} PRIVATE CMRC_NO_EXCEPTIONS=1)
 
 if(NOT GAME_NO_HOTRELOAD)
-  target_link_libraries(${PROJECT_NAME}_lib raylib imgui::imgui fmt::fmt
-                        box2d::box2d game::resources)
+  target_link_libraries(common ${LIBS_TO_LINK})
+  target_link_libraries(${PROJECT_NAME}_lib ${LIBS_TO_LINK} common
+                        game::resources)
+  target_link_libraries(${PROJECT_NAME} common)
   target_compile_definitions(${PROJECT_NAME}_lib PRIVATE CMRC_NO_EXCEPTIONS=1)
-else()
-  target_link_libraries(${PROJECT_NAME} game::resources)
-  target_compile_definitions(${PROJECT_NAME} PRIVATE CMRC_NO_EXCEPTIONS=1)
+  target_compile_definitions(common PRIVATE CMRC_NO_EXCEPTIONS=1)
 endif()
 
 # on windows, copy all DLLs into build result folder

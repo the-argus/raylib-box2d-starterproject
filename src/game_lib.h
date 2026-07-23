@@ -59,15 +59,22 @@ class GameLib
     GameLib(const GameLib &) = delete;
     GameLib &operator=(GameLib &&) = delete;
     GameLib &operator=(const GameLib &) = delete;
-    ~GameLib() { unloadIfLoaded(); }
+    ~GameLib()
+    {
+#ifndef NO_HOTRELOAD
+        if (m_deinitCallback) {
+            m_deinitCallback(m_gameContext);
+        }
+#else
+        ::deinit(m_gameContext);
+#endif
+        unloadIfLoaded();
+    }
 
     void unloadIfLoaded()
     {
 #ifndef NO_HOTRELOAD
         if (m_library) {
-            if (m_deinitCallback) {
-                m_deinitCallback(m_gameContext);
-            }
             dlload::close(m_library);
             m_library = nullptr;
             m_frameCallback = nullptr;
@@ -75,8 +82,6 @@ class GameLib
             m_initCallback = nullptr;
             m_onHotReloadCallback = nullptr;
         }
-#else
-        ::deinit(m_gameContext);
 #endif
     }
 

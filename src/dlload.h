@@ -115,7 +115,7 @@ inline handle invalid_handle() { return nullptr; }
 
 namespace name {
 inline const char *prefix() { return "lib"; }
-inline const char *suffix() { return ::; }
+inline const char *suffix() { return ""; }
 inline const char *extension() { return "dylib"; }
 } // namespace name
 

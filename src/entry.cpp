@@ -95,7 +95,7 @@ extern "C"
         auto *const ctx = static_cast<GameContext *>(context);
 
         CAllocator mainAllocator;
-        Arena frameArena(&mainAllocator);
+        Arena frameArena{&mainAllocator};
 
         ctx->frameAllocator = &frameArena;
         defer resetToNull = [ctx] { ctx->frameAllocator = nullptr; };

@@ -7,8 +7,8 @@
 class Arena : public Allocator
 {
   public:
-    explicit Arena(Bytes static_buffer) NOEXCEPT;
-    explicit Arena(Allocator *backing_allocator) NOEXCEPT;
+    explicit Arena(Bytes staticBuffer) NOEXCEPT;
+    explicit Arena(Allocator *backingAllocator) NOEXCEPT;
 
     Arena(Arena &&other) = delete;
     Arena &operator=(Arena &&other) = delete;
@@ -16,7 +16,7 @@ class Arena : public Allocator
     Arena &operator=(const Arena &) = delete;
     Arena(const Arena &) = delete;
 
-    ~Arena() NOEXCEPT { destroy(); }
+    ~Arena() NOEXCEPT;
 
     void clear() NOEXCEPT;
 
@@ -29,12 +29,7 @@ class Arena : public Allocator
 
     void impl_arenaPushDestructor(DestructorBase &entry) NOEXCEPT override;
 
-    constexpr void impl_deallocate(void *memory,
-                                   size_t size_hint) NOEXCEPT final
-    {
-        // deallocating with an arena is a no-op
-        return;
-    }
+    void impl_deallocate(void *memory, size_t sizeHint) NOEXCEPT final;
 
     Result<Bytes, alloc::Error>
     impl_reallocate(const alloc::ReallocateRequest &options) NOEXCEPT final;

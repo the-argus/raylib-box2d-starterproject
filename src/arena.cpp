@@ -35,6 +35,14 @@ Arena::impl_reallocate(const alloc::ReallocateRequest &options) NOEXCEPT
     return newmem;
 }
 
+void Arena::impl_deallocate(void *memory, size_t sizeHint) NOEXCEPT
+{
+    (void)memory;
+    (void)sizeHint;
+}
+
+Arena::~Arena() NOEXCEPT { destroy(); }
+
 Arena::Arena(Bytes staticBuffer) NOEXCEPT : m_memory(staticBuffer),
                                             m_firstAvailableByteIndex(0)
 {

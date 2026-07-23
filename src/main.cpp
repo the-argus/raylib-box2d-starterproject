@@ -14,18 +14,21 @@
 #include <imgui_impl_raylib.h>
 
 #include <chrono>
-#ifndef NO_HOTRELOAD
 #include <filesystem>
-#endif
 
-using TimePoint = std::chrono::time_point<std::chrono::system_clock>;
+// we only use file time in this file. this means if a filesystem has a low
+// resolution understanding of modify time, changes could be missed if you make
+// them within 1-2 seconds of a reload. but i dont care, just wait and try
+// again :D. also nobody uses those filesystems anyways
+using Clock = std::filesystem::file_time_type::clock;
+using TimePoint = std::filesystem::file_time_type;
 using Duration =
     decltype(std::declval<TimePoint>() - std::declval<TimePoint>());
 
 struct AppState
 {
     GameLib gameLib{HOTRELOAD_LIB_PATH};
-    TimePoint lastHotreloadRecompileTime = std::chrono::system_clock::now();
+    TimePoint lastHotreloadRecompileTime = Clock::now();
 
     void reloadIfNeeded();
 };
@@ -156,10 +159,7 @@ static bool scanForSourceChanges(const char *sourceRootPath,
         return false;
     }
 
-    using T = std::remove_cvref_t<decltype(*sourceLastWriteTime)>;
-    return std::chrono::clock_cast<std::chrono::system_clock, T::clock,
-                                   T::duration>(*sourceLastWriteTime) >
-           lastRecompilationTime;
+    return *sourceLastWriteTime > lastRecompilationTime;
 }
 #endif
 
@@ -185,8 +185,7 @@ void AppState::reloadIfNeeded()
                                 "Successfully hotreloaded library {}",
                                 HOTRELOAD_LIB_PATH);
                     }
-                    this->lastHotreloadRecompileTime =
-                        std::chrono::system_clock::now();
+                    this->lastHotreloadRecompileTime = Clock::now();
                 } else {
                     LOGERROR_MSG(Hotreload, "Did not see a change in the game "
                                             "DLL, aborting hot reload");
