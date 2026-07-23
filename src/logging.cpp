@@ -27,6 +27,8 @@ static const char *loggingCategoryToString(LoggingCategory category) NOEXCEPT
         return "Physics";
     case LoggingCategory::Renderer:
         return "Renderer";
+    case LoggingCategory::Pool:
+        return "Pool";
     case LoggingCategory::Serialization:
         return "Serialization";
     case LoggingCategory::Raylib:

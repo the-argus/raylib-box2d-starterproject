@@ -123,7 +123,7 @@ class Allocator
         requires std::is_invocable_r_v<void, T> and
                  std::is_move_constructible_v<T> and
                  std::is_trivially_destructible_v<T>
-    constexpr void pushDestructor(T &&destructorCallableObject) NOEXCEPT
+    constexpr alloc::Error pushDestructor(T &&destructorCallableObject) NOEXCEPT
     {
         struct Destructor : public DestructorBase
         {
@@ -141,7 +141,8 @@ class Allocator
             this->make<Destructor>(std::move(destructorCallableObject));
         if (not maybeDestructor) [[unlikely]]
             return maybeDestructor.error();
-        this->impl_arenaPushDestructor(maybeDestructor.unwrap());
+        this->impl_arenaPushDestructor(maybeDestructor.value());
+        return alloc::Error::Success;
     }
 
     [[nodiscard]] constexpr RestorePoint beginScope() NOEXCEPT

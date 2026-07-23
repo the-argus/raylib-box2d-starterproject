@@ -2,11 +2,14 @@
 
 #include <raylib.h>
 
+constexpr f32 bulletLifetimeSeconds = 1.f;
+
 Bullet::Bullet(b2::World world, b2::Vec2 position, b2::Vec2 velocity)
 {
-    BulletHandle selfHandle = Pool<Bullet>::instance()->handleForItem(*this);
-    uassert(selfHandle, "Bullets should only be created within the bullet "
-                        "pool, via makeBullet()");
+    // make sure this item was created in the pool, otherwise handleForItem
+    // would fail
+    uassert(handleForItem(*this), "Bullets should only be created within the "
+                                  "bullet pool, via make<Bullet>(...)");
 
     auto def = b2::Body::defaultDefinition();
     def.isBullet = true;
@@ -22,7 +25,17 @@ Bullet::Bullet(b2::World world, b2::Vec2 position, b2::Vec2 velocity)
     this->body = world.createBody(&def);
 }
 
+void Bullet::update(GameContext *ctx, f32 deltaTime)
+{
+    lifetimer += deltaTime;
+
+    if (lifetimer > bulletLifetimeSeconds) {
+        ctx->doAtEndOfFrame([this] { destroy(*this); });
+    }
+}
+
 void Bullet::draw()
 {
-    DrawRectangle(body.position().x, body.position().y, 1, 1, RED);
+    DrawRectangle(body.position().x, body.position().y, 1, 1,
+                  lifetimer > 0.5 ? RED : GREEN);
 }

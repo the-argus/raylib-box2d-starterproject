@@ -206,10 +206,8 @@ void Player::update(GameContext *ctx, f32 deltaTime)
     if (isMouseButtonJustPressedInApp(MOUSE_BUTTON_LEFT)) {
         Vector2 mousePos = GetScreenToWorld2D(GetMousePosition(), ctx->camera);
         Vector2 dirTo = Vector2Normalize(mousePos - conv(this->position));
-        fmt::println("MOUSE PRESSED, SPAWNING BULLET AT {} {}",
-                     this->position.x, this->position.y);
         BulletHandle newBullet =
-            makeBullet(ctx->world, this->position, conv(dirTo * 10.f));
+            make<Bullet>(ctx->world, this->position, conv(dirTo * 10.f));
         // do something with newBullet I guess
     }
 }

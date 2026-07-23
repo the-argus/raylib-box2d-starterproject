@@ -57,7 +57,8 @@ set(hotreloaded_source_files
 set(main_source_files src/main.cpp)
 set(include_directories src/ vendor/raylib_box2d_debugdraw)
 
-add_executable(pool_test src/pool_test.cpp src/allocator.cpp src/arena.cpp)
+add_executable(pool_test src/pool_test.cpp src/allocator.cpp src/arena.cpp
+                         src/logging.cpp)
 target_include_directories(pool_test PRIVATE src/)
 
 # the game may run `cmake --build HOTRELOAD_BUILD_DIR --target
@@ -172,6 +173,9 @@ add_subdirectory(assets)
 set(LIBS_TO_LINK raylib imgui::imgui fmt::fmt box2d::box2d)
 target_link_libraries(${PROJECT_NAME} ${LIBS_TO_LINK} game::resources)
 target_compile_definitions(${PROJECT_NAME} PRIVATE CMRC_NO_EXCEPTIONS=1)
+
+# logging uses raylib enums/types and formatter
+target_link_libraries(pool_test PRIVATE fmt::fmt raylib)
 
 if(NOT GAME_NO_HOTRELOAD)
   target_link_libraries(common ${LIBS_TO_LINK})

@@ -43,6 +43,14 @@ struct GameContext
     // GameContext(GameContext &&) = delete;
     // GameContext &operator=(GameContext &&) = delete;
 
+    /// Call some function at the end of the frame. Pointers to thing allocated
+    /// in the frame allocator will still be alive, but freed right after the
+    /// callback will get called (start of the next frame)
+    template <typename Callable> void doAtEndOfFrame(Callable &&function)
+    {
+        frameAllocator->pushDestructor(std::forward<Callable>(function));
+    }
+
     ~GameContext() { UnloadTexture(textureMissing); }
 };
 

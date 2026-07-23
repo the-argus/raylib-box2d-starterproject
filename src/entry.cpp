@@ -102,6 +102,10 @@ extern "C"
 
         ctx->player->update(ctx, GetFrameTime());
 
+        for (Bullet &bullet : Pool<Bullet>::instance()->items()) {
+            bullet.update(ctx, GetFrameTime());
+        }
+
         // TODO: fix our timestep
         // https://www.gafferongames.com/post/fix_your_timestep/
         // (Requires drawing things interpolated). We will just enable vsync

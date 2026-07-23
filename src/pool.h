@@ -2,6 +2,7 @@
 #define __GAME_POOL_H__
 
 #include "allocator.h"
+#include "logging.h"
 #include "macros.h"
 
 #ifndef NDEBUG
@@ -76,12 +77,66 @@ template <typename T> class Pool
     static Pool *instance() { return globalInstance; }
     static void setInstance(Pool *newValue) { globalInstance = newValue; }
 
-    std::span<T> items() { return std::span<T>{m_buffer, m_size}; }
+    struct Range;
+    friend struct Range;
 
-    std::span<const T> items() const
+    // the express purpose of a sentinel is to be an object which can be
+    // compared to an iterator (a pointer to T that gets incremented) and then
+    // say whether that pointer is 'done' ie. out of bounds / not looking at
+    // items anymore
+    struct Sentinel
     {
-        return std::span<const T>{m_buffer, m_size};
-    }
+        [[nodiscard]] bool operator==(T *item)
+        {
+            auto *instance = Pool::instance();
+            return item < instance->m_buffer or
+                   item >= instance->m_buffer + instance->m_size;
+        }
+    };
+
+    struct Range
+    {
+        Range() { Pool::instance()->m_numLiveIterators++; }
+        ~Range() { destroy(); }
+
+        Range(Range &&other) : m_owning(std::exchange(other.m_owning, false)) {}
+
+        Range &operator=(Range &&other)
+        {
+            if (&other == this)
+                return *this;
+            destroy();
+            m_owning = std::exchange(other.m_owning, false);
+            return *this;
+        }
+
+        Range(const Range &) = delete;
+        Range &operator=(const Range &) = delete;
+
+        T *begin()
+        {
+            auto *instance = Pool::instance();
+            return instance->m_buffer;
+        }
+
+        Sentinel end() { return {}; }
+
+        /// the number of live items currently in the pool
+        [[nodiscard]] u32 size() const { return Pool::instance()->m_size; }
+
+      private:
+        void destroy()
+        {
+            if (m_owning) {
+                Pool::instance()->m_numLiveIterators--;
+            }
+        }
+
+        bool m_owning = true;
+        T *m_current = Pool::instance()->m_buffer;
+    };
+
+    Range items() { return Range{}; }
 
     [[nodiscard]] Handle handleForItem(const T &item)
     {
@@ -257,6 +312,14 @@ template <typename T> class Pool
     /// returns true if the object existed and was destroyed
     bool destroy(Handle item)
     {
+        if (m_numLiveIterators > 0) {
+            LOGERROR_MSG(
+                Pool,
+                "Tried to destroy a thing from a pool while iterating over the "
+                "pool. Probably use ctx->doAtEndOfFrame([thing]{ "
+                "destroy(thing); }) instead");
+            return false;
+        }
         if (not isValid(item)) {
             return false;
         }
@@ -367,6 +430,36 @@ template <typename T> class Pool
     u32 m_size{};
     u32 m_capacity{};
     u32 m_firstFreeMapEntry{};
+    u32 m_numLiveIterators{};
 };
+
+/// Create an item in its corresponding pool. May return null on allocation
+/// failure
+template <typename T, typename... ConstructorArgs>
+    requires std::is_constructible_v<T, ConstructorArgs...>
+Pool<T>::Handle make(ConstructorArgs &&...args)
+{
+    return Pool<T>::instance()->make(std::forward<ConstructorArgs>(args)...);
+}
+
+/// Remove an item from its pool and call its destructor
+template <typename T> void destroy(typename Pool<T>::Handle handle)
+{
+    return Pool<T>::instance()->destroy(handle);
+}
+
+/// Remove an item from its pool and call its destructor
+template <typename T> void destroy(const T &item)
+{
+    auto *instance = Pool<T>::instance();
+    instance->destroy(instance->handleForItem(item));
+}
+
+/// Get the handle for something from a reference to it. Returns null if the
+/// thing passed as a reference is not actually a thing in the pool
+template <typename T> Pool<T>::Handle handleForItem(const T &item)
+{
+    return Pool<T>::instance()->handleForItem(item);
+}
 
 #endif
