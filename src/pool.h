@@ -23,8 +23,7 @@ constexpr u32 invalidU32 = std::numeric_limits<u32>::max();
 
 template <typename T> class Pool
 {
-    inline static Pool defaultGlobalInstance{cAllocator()};
-    inline static Pool *globalInstance = &defaultGlobalInstance;
+    static Pool *globalInstance;
 
     struct MapEntry
     {
@@ -432,6 +431,13 @@ template <typename T> class Pool
     u32 m_firstFreeMapEntry{};
     u32 m_numLiveIterators{};
 };
+
+namespace detail {
+    template <typename T> static Pool<T> defaultGlobalInstance{cAllocator()};
+}
+
+template <typename T>
+Pool<T>* Pool<T>::globalInstance = &detail::defaultGlobalInstance<T>;
 
 /// Create an item in its corresponding pool. May return null on allocation
 /// failure
